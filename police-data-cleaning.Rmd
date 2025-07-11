@@ -1,0 +1,159 @@
+---
+title: "police-data-cleaning"
+author: "Nicholas Copland"
+date: "2025-07-03"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+#setup packages
+library(tidyverse)
+library(dplyr)
+
+```
+
+
+```{r}
+arrests = read.csv("C:/Users/Nicholas Copland/OneDrive - University of North Carolina at Chapel Hill/STOR_320/Final/data/Police_Arrests_Made.csv")
+incidents = read.csv("C:/Users/Nicholas Copland/OneDrive - University of North Carolina at Chapel Hill/STOR_320/Final/data/Police_Incident_Reports.csv")
+```
+
+```{r}
+names(arrests) #Check column names
+arrests
+names(incidents)
+incidents
+```
+
+```{r}
+#Rename columns
+a1 = select(arrests, -X, -Y,
+    Charge = Primary_Charge,
+    Zip = Zipcode,
+    Arrest_Date = Date_of_Arrest,
+    Arrest_Type = Type_of_Arrest,
+    Drugs_Alcohol = Drugs_or_Alcohol_Present,
+    Weapon = Weapon_Present,
+    Object_Id = ObjectId)
+
+i1 = select(incidents, -`x`, -`y`,
+    Incident_Id = `Incident.ID`,
+    Zip = Zipcode,
+    Report_Date = `Date.of.Report`,
+    Occur_Date = `Date.of.Occurrence`,
+    Found_Date = `Date.Found`,
+    Premise = `Premise.Description`,
+    Weapon = `Weapon.Description`,
+    Victim_Age = `Victim.Age`,
+    Victim_Race = `Victim.Race`,
+    Victim_Gender = `Victim.Gender`,
+    Object_Id = ObjectId
+)
+glimpse(a1)
+glimpse(i1)
+```
+
+```{r}
+#Convert all dates and times to dttm type
+a2 <- a1 %>%
+  mutate(Arrest_Date = ymd_hms(Arrest_Date))
+
+glimpse(a2)
+
+i2 <- i1 %>%
+  mutate(
+    Report_Date = mdy_hms(Report_Date),
+    Occur_Date = mdy_hms(Occur_Date),
+    Found_Date = mdy_hms(Found_Date)
+  )
+
+glimpse(i2)
+```
+
+```{r}
+#Fix all the null values and turn them into NAs
+a3 <- a2 %>%
+  mutate(across(where(is.character), ~ na_if(., "<Null>"))) %>%
+  mutate(across(where(is.character), ~ na_if(., "")))
+
+i3 <- i2 %>%
+  mutate(across(where(is.character), ~ na_if(., "<Null>"))) %>%
+  mutate(across(where(is.character), ~ na_if(., ""))) %>%
+  mutate(across(where(is.numeric), ~ na_if(., 0)))
+
+
+
+a3 %>% arrange(desc(Age))
+```
+
+```{r}
+#Convert variables that should be numeric to int and drop values that are alphabetical
+#Need to address this in the paper as it only removes a few rows that are unusable in our project
+a4 = a3 %>%
+  mutate(
+    Incident_Id = as.integer(Incident_Id)
+  ) %>%
+  filter(!is.na(Incident_Id)) %>%
+  mutate(
+    Incident_Id = as.character(Incident_Id),
+    Age = as.integer(Age)
+  )
+a4
+
+shifted = a3 %>%
+  mutate(
+    Incident_Id = as.character(Incident_Id)
+  ) %>%
+  filter(!is.na(Incident_Id))
+
+shifted
+
+```
+
+
+
+
+```{r}
+#Renaming dataset to organize better
+names(arrests)
+
+length(arrests$Age)
+arrests1 = arrests %>%
+  rename(IncidentID = Incident_Id, Charge = Primary_Charge, Date = Date_of_Arrest, Type = Type_of_Arrest, ObjectID = ObjectId, Drugs_Alcohol = Drugs_or_Alcohol_Present, Weapon = Weapon_Present) %>%
+  #Convert non-numeric variables
+  mutate(Age = as.numeric(Age)) %>%
+  mutate(IncidentID = as.numeric(IncidentID)) %>%
+  select(-X, -Y) #Removing X and Y columns
+
+length(arrests1$Age)
+
+arrests2 = arrests1 %>%
+  filter(., !is.numeric(IncidentID))
+
+arrests2
+
+length(arrests2$Age)
+
+show = filter(arrests2, ObjectID == 38464)
+show
+
+head(arrests1)
+```
+
+```{r}
+
+```
+
+
+
+```{r}
+names(arrests)
+head(arrests)
+
+cocaine = filter(arrests, grepl("cocaine", Primary_Charge, ignore.case = TRUE))
+length(cocaine$Age)
+cocaine
+```
+
+
+
