@@ -27,7 +27,7 @@ library(tidyverse)
 #
 ```
 
-# Interpreter: FIRSTNAME LASTNAME
+# Interpreter: Mariana Rodriguez-Pacheco
 
 ### Q1: WRITE_QUESTION_HERE
 
