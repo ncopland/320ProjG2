@@ -68,18 +68,22 @@ i2 <- i1 %>%
   )
 
 glimpse(i2)
+summary(a2$Arrest_Date)
+summary(i2$Occur_Date)
+
 ```
 
 ```{r}
 #Fix all the null values and turn them into NAs
 a3 <- a2 %>%
   mutate(across(where(is.character), ~ na_if(., "<Null>"))) %>%
-  mutate(across(where(is.character), ~ na_if(., "")))
+  mutate(across(where(is.character), ~ na_if(., ""))) %>%
+  mutate(across(where(is.character), ~ na_if(., "0")))
 
 i3 <- i2 %>%
   mutate(across(where(is.character), ~ na_if(., "<Null>"))) %>%
   mutate(across(where(is.character), ~ na_if(., ""))) %>%
-  mutate(across(where(is.numeric), ~ na_if(., 0)))
+  mutate(across(where(is.character), ~ na_if(., "0")))
 
 
 
@@ -98,61 +102,38 @@ a4 = a3 %>%
     Incident_Id = as.character(Incident_Id),
     Age = as.integer(Age)
   )
-a4
 
-shifted = a3 %>%
+shifted_rank = a3 %>%
   mutate(
-    Incident_Id = as.character(Incident_Id)
+    Incident_Id = as.integer(Incident_Id)
   ) %>%
-  filter(!is.na(Incident_Id))
+  filter(is.na(Incident_Id)) %>%
+  transmute(rank = Object_Id)
 
-shifted
-
-```
-
-
-
-
-```{r}
-#Renaming dataset to organize better
-names(arrests)
-
-length(arrests$Age)
-arrests1 = arrests %>%
-  rename(IncidentID = Incident_Id, Charge = Primary_Charge, Date = Date_of_Arrest, Type = Type_of_Arrest, ObjectID = ObjectId, Drugs_Alcohol = Drugs_or_Alcohol_Present, Weapon = Weapon_Present) %>%
-  #Convert non-numeric variables
-  mutate(Age = as.numeric(Age)) %>%
-  mutate(IncidentID = as.numeric(IncidentID)) %>%
-  select(-X, -Y) #Removing X and Y columns
-
-length(arrests1$Age)
-
-arrests2 = arrests1 %>%
-  filter(., !is.numeric(IncidentID))
-
-arrests2
-
-length(arrests2$Age)
-
-show = filter(arrests2, ObjectID == 38464)
-show
-
-head(arrests1)
-```
-
-```{r}
+shifted = filter(a3, a3$Object_Id %in% shifted_rank$rank) #Saved so we can show that we only got rid of 237 unusable rows.
 
 ```
 
+```{r}
+#Get rid of Incorrect zips only use the chapel hill Zips from https://www.zip-codes.com/city/nc-chapel-hill.asp
+a5 = a4 %>%
+  filter(Zip %in% c(27514, 27515, 27516, 27517, 27599))
+i4 = i3 %>%
+  mutate(Zip = as.integer(Zip))
+i5 = i4 %>%
+  filter(Zip %in% c(27514, 27515, 27516, 27517, 27599))
 
+#Isolate Chapel Hill occurances
+a6 = a5 %>%
+  filter(City == "CHAPEL HILL")
+
+i6 = i5 %>%
+  filter(City == "CHAPEL HILL")
+```
 
 ```{r}
-names(arrests)
-head(arrests)
-
-cocaine = filter(arrests, grepl("cocaine", Primary_Charge, ignore.case = TRUE))
-length(cocaine$Age)
-cocaine
+write.csv(a6, "Police_Arrests_Clean.csv", row.names = FALSE)
+write.csv(i6, "Police_Incidents_Clean.csv", row.names = FALSE)
 ```
 
 
