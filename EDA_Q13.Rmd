@@ -1,0 +1,122 @@
+---
+title: "Q13"
+author: "Sarah Bazari"
+date: "2025-07-15"
+output: html_document
+---
+
+```{r}
+# What types of charges are most likely to involve weapons, and does weapon presence vary by race or gender?
+```
+
+```{r}
+# most common charges for each weapon type
+
+charges_by_weapon = data %>%
+  filter(!is.na(Weapon)) %>%
+  group_by(Weapon, Charge) %>%
+  summarize(Count = n(), .groups = "drop") %>%
+  arrange(Weapon, desc(Count))
+
+head(charges_by_weapon, 10)
+```
+
+```{r}
+# weapon presence by race and gender
+
+weapon_by_race_gender = data %>%
+  filter(!is.na(Weapon), Gender %in% c("M", "F"), Race !="U") %>%
+  group_by(Weapon, Race, Gender) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  arrange(Weapon, desc(Count))
+
+head(weapon_by_race_gender, 10)
+```
+
+```{r}
+# visual 'weapon_by_race_gender'
+
+library(stringr)
+
+weapon_by_race_gender$Weapon <- str_wrap(weapon_by_race_gender$Weapon, width = 15)
+
+ggplot(weapon_by_race_gender, aes(x = Race, y = Count, fill = Gender)) +
+  geom_col(position = "dodge", width = 0.7) +
+  facet_wrap(~ Weapon, scales = "free_y", ncol = 3) +
+  scale_fill_manual(values = c("F" = "#f8766d", "M" = "#00bfc4")) +
+  labs(
+    title = "Weapons Involved in Arrests by Race and Gender",
+    subtitle = "Grouped by weapon type and separated by gender",
+    x = "Race",
+    y = "Number of Arrests",
+    fill = "Gender"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    strip.text = element_text(face = "bold", size = 9, angle = 0),
+    strip.text.x = element_text(margin = margin(b = 5)),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+```
+
+```{r}
+# visual for most common charges for the top 3 weapon types
+
+library(ggplot2)
+
+top_charges = data %>%
+  filter(!is.na(Charge)) %>%
+  count(Charge, sort = TRUE) %>%
+  slice_max(n, n = 15)
+
+ggplot(top_charges, aes(x = reorder(Charge, n), y = n)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 15 Charges in Chapel Hill", x = "Charge", y = "Number of Arrests") +
+  theme_minimal()
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(stringr)
+
+# fix name of one of the weapons
+data <- data %>%
+  mutate(Weapon = str_to_upper(Weapon)) %>%
+  mutate(Weapon = ifelse(Weapon == "LETHAL CUTTING INSTRUMENT", "CUTTING INSTRUMENT", Weapon))
+
+# top 3 weapons
+top_weapons <- data %>%
+  filter(!is.na(Weapon)) %>%
+  count(Weapon, sort = TRUE) %>%
+  slice_max(n, n = 3) %>%
+  pull(Weapon)
+
+# top 5 charges each weapon
+top_charges <- data %>%
+  filter(Weapon %in% top_weapons, !is.na(Charge)) %>%
+  group_by(Weapon, Charge) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  group_by(Weapon) %>%
+  slice_max(Count, n = 5) %>%
+  ungroup()
+
+top_charges$Charge <- str_wrap(top_charges$Charge, width = 20)
+
+ggplot(top_charges, aes(x = Charge, y = Count)) +
+  geom_col(fill = "steelblue") +
+  facet_wrap(~ Weapon, scales = "free") +
+  labs(
+    title = "Top 5 Charges for the 3 Most Common Weapon Types",
+    x = "Charge", y = "Number of Arrests"
+  ) +
+  coord_cartesian(clip = "off") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 55, hjust = 1, size = 5),
+        strip.text = element_text(size = 10)
+)
+```
+
