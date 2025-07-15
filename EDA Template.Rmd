@@ -11,7 +11,7 @@ library(tidyverse)
 library(leaflet)
 
 # Import Data Below
-police_arrests = read_csv("Police_Arrests_Clean.csv")
+police_arrests = read_csv("Police_Arrests_Clean2.csv")
 ```
 
 # Creator: FIRSTNAME LASTNAME
@@ -45,12 +45,8 @@ leaflet() %>%
   setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
   addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
   addCircleMarkers(lng = drug_alc_data$longitude, lat = drug_alc_data$latitude, radius = drug_alc_data$Count / 2)
-# The two biggest circles are at East Chapel Hill High School (not surprised) and Chapel Hill Police Department (very surprised)
-# There's also a small pattern in Downtown Chapel Hill near UNC Campus (not surprised)
 ```
-```{r}
-#
-```
+
 
 ### Q2: Are any age groups (e.g., young: 18–25, middle-aged: 26–45, older: 46+) strongly associated with a specific type of charge?
 
@@ -75,7 +71,7 @@ police_arrests = mutate(police_arrests, Age_Group = age_group)
 ```
 
 ```{r}
-new_police_arrests_data = police_arrests %>%
+top_10_data = police_arrests %>%
   group_by(Age_Group, Charge) %>%
   summarise(Count = n()) %>%
   mutate(Proportion = Count / sum(Count)) %>%
@@ -85,21 +81,11 @@ new_police_arrests_data = police_arrests %>%
 ```
 
 ```{r}
-ggplot(new_police_arrests_data) +
+ggplot(top_10_data) +
   geom_bar(aes(x = reorder(Charge, -Proportion), y = Proportion, fill = Age_Group), stat = "identity") +
   facet_wrap(~Age_Group, nrow = 1) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) +
   labs(title = "Top 10 Charges by Age Group", y = "Proportion", x = "Charge")
-```
-```{r}
-stats_data = table(police_arrests$Age_Group, police_arrests$Charge)
-chisq.test(stats_data, simulate.p.value = TRUE)
-# Top 3 of Young: impaired driving, fail to appear, possesion of marijuana (not surpised)
-# Top 2 of Middle: impaired driving, fail to appear (not surpised)
-# Top 3 of Older: open container, fail to appear, 2nd degree trespass (surprised)
-# Driving impaired (DWI) is the most common in young and middle-aged people. 
-# Fail to appear is the second most common in middle-aged and older people.
-# Open container in the most common in older people.
 ```
 
 # Orator: FIRSTNAME LASTNAME
@@ -137,16 +123,16 @@ chisq.test(stats_data, simulate.p.value = TRUE)
 - Q1: What factors might explain why trespassing charges are more common among older individuals?
 - Q2: Do institutional locations like schools appear to influence where alcohol and drug-related arrests are recorded?
 - Q3: Does the distribution of charges in the 'Unknown' age group suggest that it may include individuals under 18?
-- Q4: Why is there a high concentration of underage drinking and drug-related charges reported at the Chapel Hill Police Department’s address?
+- Q4: Why is there a high concentration of underage drinking and drug related charges reported at the Chapel Hill Police Department’s address?
 
 ### Investigation of Follow-up Questions
 
-GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (I decided to investigate Q3 and Q4 in further detail.)
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES: I decided to investigate Q3 and Q4 in further detail.
 
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
 ```{r}
-u_data = police_arrests %>%
+uknown_age_data = police_arrests %>%
   filter(is.na(Age)) %>%
   group_by(Street, latitude, longitude) %>%
   summarise(Count = n()) %>%
@@ -157,17 +143,14 @@ leaflet() %>%
   addTiles() %>%
   setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
   addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
-  addCircleMarkers(lng = u_data$longitude, lat = u_data$latitude, radius = u_data$Count / 2)
-# Given the bar chart about unknown age peopel from before, we see that the three most common charges are underage possesion, possesion of marijuana, and consume alocholic beverage less than 21. The three most common places are the police department, east chapel hill high shcool and chapel hill high school. You can also that along with unknown age, there is also unknown race, gender, and ethnicty. This could be due to protecting the identity of minors.
+  addCircleMarkers(lng = uknown_age_data$longitude, lat = uknown_age_data$latitude, radius = uknown_age_data$Count / 2)
 ```
 
 ```{r}
-police_department = filter(police_arrests, Street == "828 MARTIN LUTHER KING JR BLVD", Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG"))
+police_department_data = filter(police_arrests, Street == "828 MARTIN LUTHER KING JR BLVD", Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG"))
 
-ggplot(police_department)+
+ggplot(police_department_data)+
   geom_bar(aes(x = Arrest_Type))
-
-# Summoned/Cited is the most common type of arrest at the police department if you have alcohol or drug charges. A summoned/cited arrest, in legal terms, refers to a situation where a person is formally notified of criminal charges and ordered to appear in court, but is not physically arrested and taken into custody. Instead, they receive a summons or citation, which serves as a formal notification of the charges and an order to appear in court on a specific date and time. 
 ```
 
 # Summary
@@ -180,15 +163,8 @@ PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP Q
 
 
 
+In investigating the initial questions, I found that alcohol and drug related arrests in Chapel Hill were geographically concentrated in specific areas: East Chapel Hill High School, Downtown Chapel Hill, and, surprisingly, the Chapel Hill Police Department. This pattern was consistent with expectations around underage drinking and drug use occurring near high schools and the University of North Carolina at Chapel Hill, but the high arrest count at the police department was unexpected for me. Additionally, I learned that certain charges were more common within specific age groups. Young and middle-aged individuals were most often charged with impaired driving and failure to appear in court, while older individuals showed a higher rate of open container and trespassing charges. These findings raised interesting questions about why some charges appear more frequently in older age groups and what role public institutions might play in arrest patterns.
 
-
-
-
-
-
-
-
-
-
+For the follow-up questions, I decided to explore whether the “Unknown” age group might contain minors and why there were so many drug and alcohol related arrests at the police department. A bar chart from earlier showed that the most common charges in the “Unknown” age group were underage possession and marijuana-related offenses, and these arrests also had missing information like race and gender. This, along with their locations (schools and the police station), suggests the possibility that these records involved minors whose identities were protected. To better understand the arrests at the police department itself, I examined arrest types for alcohol and drug charges at that location and found that most were "Summoned/Cited" arrests, meaning individuals were not physically taken into custody but given court orders. This helped clarify that the location listed for these arrests may reflect citation processing rather than where the incident occurred.
 
 
