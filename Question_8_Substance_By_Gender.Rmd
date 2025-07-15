@@ -1,0 +1,91 @@
+
+---
+title: "Question 8: Substance-Involved Arrests by Gender"
+author: "Stor 320 group2 Q8"
+output: html_document
+---
+
+## Question 8
+
+**How does the presence of drugs or alcohol at the time of arrest (as recorded in the `Drugs_Alcohol` column) vary by gender, and which gender shows a higher proportion of substance-involved arrests?**
+
+---
+
+### Load Data
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+```{r read-and-clean-data}
+# Read the dataset
+arrests <- read_csv("Police_Arrests_Clean.csv")
+
+# Filter Drugs_Alcohol and remove unknowns
+arrests <- read_csv("Police_Arrests_Clean.csv") %>%
+  filter(
+    !is.na(Gender), Gender %in% c("M", "F"),           # keep only Male and Female
+    !is.na(Drugs_Alcohol), Drugs_Alcohol %in% c("Y", "N")  # keep only valid substance values
+  ) %>%
+  mutate(
+    Substance = ifelse(Drugs_Alcohol == "Y", "Substance Present", "No Substance")
+  )
+```
+
+---
+
+### Summarize Proportions by Gender
+
+```{r summarize-by-gender}
+# Filter out unknowns if needed, then summarize
+q8_summary <- arrests %>%
+  group_by(Gender, Substance) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  group_by(Gender) %>%
+  mutate(Proportion = Count / sum(Count))
+```
+
+---
+
+### Visualization
+
+```{r plot-by-gender}
+ggplot(q8_summary, aes(x = Gender, y = Proportion, fill = Substance)) +
+  geom_col(position = "dodge") +
+  geom_text(aes(label = scales::percent(Proportion, accuracy = 0.1)),
+            position = position_dodge(width = 0.9),
+            vjust = -0.5, size = 3.5) +
+  scale_fill_manual(
+    values = c("Substance Present" = "skyblue", "No Substance" = "red")
+  ) +
+  labs(
+    title = "Proportion of Substance-Involved Arrests by Gender",
+    x = "Gender",
+    y = "Proportion of Arrests",
+    fill = "Substance Involvement"
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  theme_minimal()
+```
+
+---
+
+### Interpretation
+
+This plot shows the proportion of arrests involving drugs or alcohol for each gender. The data helps us identify whether substance-involved arrests are more common among one gender relative to their total arrests in Chapel Hill. Among all arrests 66.6% of male arrests involved drugs or alcohol, compared to 54.8% of Female arrests having substance involvement. This proportion reveals that substance involvement was more prevalent among males. This difference could reflect variation the types of offenses committed or a difference in how police handle males and females that are under the influence of substances.
+
+Substance involved arrests account for more than half of Female arrests and two thirds of Male arrests indicating that drugs or alcohol play a significant role in the majority of arrest events in Chapel Hill. This implies a strong correlation between substance presence and events leading to an arrest. These findings have implications for substance abuse prevention programs and substance abuse based police training.
+
+
+Potential further questions based on this investigation.
+1. Can we predict the likelihood of a substance involved arrest based on gender, time of day, age, and use this to deploy substance abuse prevention resources.
+
+2. How can trends in subtance based arrests be used to predict emerging public health challenges
+
+
+
+
+
+
+
