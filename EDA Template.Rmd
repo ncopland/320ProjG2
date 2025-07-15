@@ -17,30 +17,71 @@ incidents = read.csv("Police_Incidents_Clean.csv")
 
 # Creator: FIRSTNAME LASTNAME
 
-### Q1: WRITE_QUESTION_HERE
+### Q1: What percentage of incidents led to arrests? (*Note: This question is what led us to discover a lack of correlation between the datasets and abandon the incidents data alltogether)
 
 ```{r}
+incidents = incidents %>%
+  mutate(
+    Year = year(Report_Date)
+  )
+
+arrests = arrests %>%
+  mutate(
+    Year = year(Arrest_Date)
+  )
+
+in1 = incidents %>%
+  filter(Year %in% 2016:2020, Offense == "SHOTS FIRED" | Offense == "GUNSHOTS")
+
+ar1 = arrests %>%
+  mutate(Year = year(Arrest_Date)) %>%
+  filter(Year %in% 2016:2020, 
+         Weapon %in% c("HANDGUN", "RIFLE", "SHOTGUN", "OTHER FIREARM", "FIREARM (TYP NOT STATED)"))
+
+in1 <- in1 %>% mutate(Incident_Day = as.Date(Report_Date))
+ar1 <- ar1 %>% mutate(Arrest_Day = as.Date(Arrest_Date))
+
+ar1_same_day <- ar1 %>%
+  filter(Arrest_Day %in% in1$Incident_Day)
+
+incidents_plot <- in1 %>%
+  transmute(
+    Lat = Latitude,
+    Long = Longitude,
+    Type = "Incident",
+    Day = Incident_Day
+  )
+
+arrests_plot <- ar1_same_day %>%
+  transmute(
+    Lat = latitude, 
+    Long = longitude,
+    Type = "Arrest",
+    Day = Arrest_Day
+  )
+
+plot_data <- bind_rows(incidents_plot, arrests_plot)
+
+shape_values <- c(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24)
+
+ggplot(plot_data, aes(x = Long, y = Lat, color = Type, shape = as.factor(Day))) +
+  geom_point(size = 3, alpha = 1) +
+  labs(
+    title = "Gun Incidents & Same-Day Gun Arrests",
+    x = "Longitude",
+    y = "Latitude",
+    color = "Type",
+    shape = "Date (Same-Day Pairs)",
+    caption = "Red = Incident, Blue = Arrest\nDifferent shapes = different days"
+  ) +
+  theme_minimal() +
+  scale_shape_manual(values = shape_values) + 
+  guides(
+    shape = guide_legend(override.aes = list(size = 4)),
+    color = guide_legend(override.aes = list(size = 4))
+  )
 ```
 
-### Q2: WRITE_QUESTION_HERE
-
-```{r}
-#
-```
-
-# Interpreter: FIRSTNAME LASTNAME
-
-### Q1: WRITE_QUESTION_HERE
-
-```{r}
-#
-```
-
-### Q2: WRITE_QUESTION_HERE
-
-```{r}
-#
-```
 
 # Orator1: Nicholas Copland
 
