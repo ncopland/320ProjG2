@@ -8,9 +8,10 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
+library(leaflet)
 
 # Import Data Below
-# read_csv()
+police_arrests = read_csv("Police_Arrests_Clean.csv")
 ```
 
 # Creator: FIRSTNAME LASTNAME
@@ -29,16 +30,76 @@ library(tidyverse)
 
 # Interpreter: Mariana Rodriguez-Pacheco
 
-### Q1: WRITE_QUESTION_HERE
+### Q1: Is there a pattern of “CONSUME ALCOHOLIC BEVERAGE LESS THAN 21”  and “DRUG -” related crimes in Chapel Hill, and on which streets (excluding house numbers) are these arrests most concentrated?
 
+```{r}
+drug_alc_data = police_arrests %>%
+  filter(Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG")) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(20)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = drug_alc_data$longitude, lat = drug_alc_data$latitude, radius = drug_alc_data$Count / 2)
+# The two biggest circles are at East Chapel Hill High School (not surprised) and Chapel Hill Police Department (very surprised)
+# There's also a small pattern in Downtown Chapel Hill near UNC Campus (not surprised)
+```
 ```{r}
 #
 ```
 
-### Q2: WRITE_QUESTION_HERE
+### Q2: Are any age groups (e.g., young: 18–25, middle-aged: 26–45, older: 46+) strongly associated with a specific type of charge?
 
 ```{r}
-#
+age = police_arrests$Age
+age_group = c()
+
+for (i in 1:length(age)) {
+  if (is.na(age[i])) {
+    age_group = c(age_group, "Unknown")
+  } else if (age[i] <= 25) {
+    age_group = c(age_group, "Young")
+  } else if (age[i] <= 45) {
+    age_group = c(age_group, "Middle-aged")
+  } else {
+    age_group = c(age_group, "Older")
+  }
+}
+
+age_group = factor(age_group, levels = c("Young", "Middle-aged", "Older", "Unknown"))
+police_arrests = mutate(police_arrests, Age_Group = age_group)
+```
+
+```{r}
+new_police_arrests_data = police_arrests %>%
+  group_by(Age_Group, Charge) %>%
+  summarise(Count = n()) %>%
+  mutate(Proportion = Count / sum(Count)) %>%
+  arrange(Age_Group, desc(Proportion)) %>%
+  mutate(Rank = min_rank(desc(Proportion))) %>%
+  filter(Rank <= 10)
+```
+
+```{r}
+ggplot(new_police_arrests_data) +
+  geom_bar(aes(x = reorder(Charge, -Proportion), y = Proportion, fill = Age_Group), stat = "identity") +
+  facet_wrap(~Age_Group, nrow = 1) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) +
+  labs(title = "Top 10 Charges by Age Group", y = "Proportion", x = "Charge")
+```
+```{r}
+stats_data = table(police_arrests$Age_Group, police_arrests$Charge)
+chisq.test(stats_data, simulate.p.value = TRUE)
+# Top 3 of Young: impaired driving, fail to appear, possesion of marijuana (not surpised)
+# Top 2 of Middle: impaired driving, fail to appear (not surpised)
+# Top 3 of Older: open container, fail to appear, 2nd degree trespass (surprised)
+# Driving impaired (DWI) is the most common in young and middle-aged people. 
+# Fail to appear is the second most common in middle-aged and older people.
+# Open container in the most common in older people.
 ```
 
 # Orator: FIRSTNAME LASTNAME
@@ -73,23 +134,40 @@ library(tidyverse)
 
 ### New Questions Based Off Initial Investigation
 
-- Q1: WRITE_QUESTION_HERE
-- Q2: WRITE_QUESTION_HERE
-- Q3: WRITE_QUESTION_HERE 
-- Q4: WRITE_QUESTION_HERE
+- Q1: What factors might explain why trespassing charges are more common among older individuals?
+- Q2: Do institutional locations like schools appear to influence where alcohol and drug-related arrests are recorded?
+- Q3: Does the distribution of charges in the 'Unknown' age group suggest that it may include individuals under 18?
+- Q4: Why is there a high concentration of underage drinking and drug-related charges reported at the Chapel Hill Police Department’s address?
 
 ### Investigation of Follow-up Questions
 
-GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (I decided to investigate Q3 and Q4 in further detail.)
 
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
 ```{r}
-#
+u_data = police_arrests %>%
+  filter(is.na(Age)) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(20)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = u_data$longitude, lat = u_data$latitude, radius = u_data$Count / 2)
+# Given the bar chart about unknown age peopel from before, we see that the three most common charges are underage possesion, possesion of marijuana, and consume alocholic beverage less than 21. The three most common places are the police department, east chapel hill high shcool and chapel hill high school. You can also that along with unknown age, there is also unknown race, gender, and ethnicty. This could be due to protecting the identity of minors.
 ```
 
 ```{r}
-#
+police_department = filter(police_arrests, Street == "828 MARTIN LUTHER KING JR BLVD", Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG"))
+
+ggplot(police_department)+
+  geom_bar(aes(x = Arrest_Type))
+
+# Summoned/Cited is the most common type of arrest at the police department if you have alcohol or drug charges. A summoned/cited arrest, in legal terms, refers to a situation where a person is formally notified of criminal charges and ordered to appear in court, but is not physically arrested and taken into custody. Instead, they receive a summons or citation, which serves as a formal notification of the charges and an order to appear in court on a specific date and time. 
 ```
 
 # Summary
