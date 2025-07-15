@@ -15,6 +15,7 @@ library(ggTimeSeries) # for time series plots
 library(viridis)      # color palettes
 library(gganimate)
 library(gifski)
+library(ggmap)
 
 # install.packages("ggTimeSeries")
 # install.packages("gganimate")
@@ -96,7 +97,7 @@ observations:
 - Arrests start high in ~2010, with counts over 3,500 per year.
 - Arrest numbers remain relatively stable between ~2010 and 2016, fluctuating slightly between ~3,200–3,600.
 - Beginning around 2017–2018, there is a noticeable decline in arrests.
-- The drop becomes much sharper around 2019–2020, falling to nearly half of earlier levels — this likely corresponds with the COVID-19 pandemic and lockdowns, when many cities saw decreased police activity and fewer arrests.
+- The drop becomes much sharper around 2019–2021, falling to nearly half of earlier levels — this likely corresponds with the COVID-19 pandemic and lockdowns, when many cities saw decreased police activity and fewer arrests, and also since we are missing arrest data from April to Sepetermber of 2021.
 - After 2020, there’s a small rebound, but the counts remain significantly lower than pre-2017 levels.
 ```
 
@@ -145,7 +146,7 @@ Arrests %>%
   count(year, month) %>%
   ggplot(aes(x = month, y = factor(year), fill = n)) +
   geom_tile() +
-  scale_fill_viridis_c() +
+  scale_fill_gradient(low = "skyblue", high = "darkblue") +
   labs(
     title = "Heatmap of Arrests by Month and Year",
     x = "Month", y = "Year", fill = "Arrests"
@@ -379,6 +380,18 @@ gifski(
 ```
 ```{r, echo=FALSE, out.width='100%'}
 knitr::include_graphics("calendar_heatmap_animation.gif")
+```
+
+# Question 2:  frequency and type of crime change across months and ZIP codes
+
+```{r}
+Incidents <- Incidents %>%
+  mutate(
+    Date = as.Date(Occur_Date),           # adjust as needed
+    Month = month(Date, label = TRUE),
+    Year = year(Date)
+  ) %>%
+  filter(!is.na(Latitude) & !is.na(Longitude)) # keep valid rows
 ```
 
 
