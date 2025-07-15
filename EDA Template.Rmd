@@ -122,12 +122,12 @@ ggplot(top_10_data) +
 
 - Q1: What factors might explain why trespassing charges are more common among older individuals?
 - Q2: Do institutional locations like schools appear to influence where alcohol and drug-related arrests are recorded?
-- Q3: Does the distribution of charges in the 'Unknown' age group suggest that it may include individuals under 18?
-- Q4: Why is there a high concentration of underage drinking and drug related charges reported at the Chapel Hill Police Department’s address?
+- Q3: Do the characteristics of arrests in the “Unknown” age group and their concentration at the Chapel Hill Police Department suggest that these cases involve minors, and what might explain the high frequency of alcohol and drug related charges at this location?
+- Q4: 
 
 ### Investigation of Follow-up Questions
 
-GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES: I decided to investigate Q3 and Q4 in further detail.
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES: We decided to investigate Q3 and Q4 in further detail.
 
 SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
 
@@ -159,12 +159,11 @@ GIVE A 2 PARAGRAPH SUMMARY.
 
 PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
 
+In investigating the initial questions, I found that alcohol and drug related arrests in Chapel Hill were geographically concentrated in specific areas: East Chapel Hill High School, Downtown Chapel Hill, and, surprisingly, the Chapel Hill Police Department. This pattern was consistent with expectations around underage drinking and drug use occurring near high schools and the University of North Carolina at Chapel Hill, but the high arrest count at the police department was unexpected for me. Additionally, I learned that certain charges were more common within specific age groups. Young and middle-aged individuals were most often charged with impaired driving and failure to appear in court, while older individuals showed a higher rate of open container and trespassing charges. These findings raised interesting questions about why some charges appear more frequently in older age groups and what role public institutions might play in arrest patterns.
+
+
 PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
 
 
-
-In investigating the initial questions, I found that alcohol and drug related arrests in Chapel Hill were geographically concentrated in specific areas: East Chapel Hill High School, Downtown Chapel Hill, and, surprisingly, the Chapel Hill Police Department. This pattern was consistent with expectations around underage drinking and drug use occurring near high schools and the University of North Carolina at Chapel Hill, but the high arrest count at the police department was unexpected for me. Additionally, I learned that certain charges were more common within specific age groups. Young and middle-aged individuals were most often charged with impaired driving and failure to appear in court, while older individuals showed a higher rate of open container and trespassing charges. These findings raised interesting questions about why some charges appear more frequently in older age groups and what role public institutions might play in arrest patterns.
-
-For the follow-up questions, I decided to explore whether the “Unknown” age group might contain minors and why there were so many drug and alcohol related arrests at the police department. A bar chart from earlier showed that the most common charges in the “Unknown” age group were underage possession and marijuana-related offenses, and these arrests also had missing information like race and gender. This, along with their locations (schools and the police station), suggests the possibility that these records involved minors whose identities were protected. To better understand the arrests at the police department itself, I examined arrest types for alcohol and drug charges at that location and found that most were "Summoned/Cited" arrests, meaning individuals were not physically taken into custody but given court orders. This helped clarify that the location listed for these arrests may reflect citation processing rather than where the incident occurred.
-
+To explore these patterns further, we investigated whether the “Unknown” age group may include minors and why there was a high concentration of drug and alcohol charges at the Chapel Hill Police Department’s address. We found that the “Unknown” group had a high number of underage drinking and marijuana-related charges, and these records often lacked details like age, race, and gender. Many of these arrests also occurred near schools or the police department, suggesting that they may involve minors whose information is legally protected. Additionally, examining arrests at the police department revealed that most were labeled as “Summoned/Cited” rather than physical detainments. This implies that the address may reflect the location where citations were processed, not necessarily where offenses occurred. Together, these findings suggest that a combination of data protection practices and recording conventions could explain both the anonymity in age and the arrest clustering at the police station.
 
