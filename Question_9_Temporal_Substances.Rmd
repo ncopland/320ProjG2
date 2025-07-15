@@ -1,0 +1,104 @@
+
+---
+title: "Temporal Patterns of Substance-Involved Arrests"
+author: "STOR 320 Group 2 Question 9"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(lubridate)
+library(scales)
+theme_set(theme_minimal())
+```
+
+## Introduction
+
+This report investigates:
+
+> **How does the timing of substance-involved arrests (by hour of day and day of week) compare to non-substance-related arrests, and what behavioral or environmental factors might explain these differences?**
+
+We use Chapel Hill arrest data to detect behavioral patterns in arrest timing, particularly around nightlife or weekend activity.
+
+## Load and Prepare Data
+
+```{r load-and-clean}
+# Load dataset
+#print(colnames(arrests))
+
+arrests <- read_csv("Police_Arrests_Clean.csv") %>%
+  filter(Drugs_Alcohol %in% c("Y", "N")) %>%
+  mutate(
+    Substance = if_else(Drugs_Alcohol == "Y", "Substance Present", "No Substance"),
+    arrest_datetime = ymd_hms(Arrest_Date),
+    hour = hour(arrest_datetime),
+    day = day(arrest_datetime),
+    month = month(arrest_datetime, label = TRUE, abbr = FALSE),
+    weekday = wday(arrest_datetime, label = TRUE, abbr = FALSE)
+  )
+```
+
+## Arrests by Hour of Day
+
+```{r plot-hourly}
+# Clean and transform data
+arrests <- arrests %>%
+  filter(Drugs_Alcohol %in% c("Y", "N")) %>%
+  mutate(
+    Substance = if_else(Drugs_Alcohol == "Y", "Substance Present", "No Substance"),
+    Arrest_Date = ymd_hms(Arrest_Date),
+    hour = hour(Arrest_Date)
+  )
+
+# Summarize by hour
+hourly_counts <- arrests %>%
+  count(hour, Substance) %>%
+  group_by(Substance) %>%
+  mutate(Proportion = n / sum(n))
+
+# Plot
+ggplot(hourly_counts, aes(x = hour, y = Proportion, fill = Substance)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Proportion of Arrests by Hour of Day",
+    x = "Hour of Day (0 = Midnight, 23 = 11PM)",
+    y = "Proportion of Arrests",
+    fill = "Substance Involvement"
+  ) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_x_continuous(breaks = 0:23) +
+  theme_minimal()
+```
+
+## Arrests by Day of Week
+
+```{r plot-weekday}
+# Summarize by day of week
+weekday_counts <- arrests %>%
+  mutate(day_of_week = wday(Arrest_Date, label = TRUE, abbr = FALSE)) %>%
+  count(day_of_week, Substance) %>%
+  group_by(Substance) %>%
+  mutate(Proportion = n / sum(n))
+
+ggplot(weekday_counts, aes(x = day_of_week, y = Proportion, fill = Substance)) +
+  geom_col(position = "dodge") +
+   geom_text(
+    aes(label = scales::percent(Proportion, accuracy = 0.1)),
+    position = position_dodge(width = 0.9),
+    vjust = -0.5,
+    size = 3.5
+  ) +
+  labs(
+    title = "Arrest Proportions by Day of Week and Substance Presence",
+    x = "Day of Week",
+    y = "Proportion of Arrests",
+    fill = "Substance"
+  ) +
+  scale_y_continuous(labels = percent_format())
+```
+
+## Interpretation
+The analysis reveals a clear temporal pattern in substance-involved arrests within Chapel Hill. In particular there is a significant increase in the proportion of arrests involving substances on the days of Friday, Saturday, Sunday. Even more specific there is a substantial concentration of arrests between the times 7pm - 3am. This strongly correlates with the typical nightlife activity in the area. This indicates that law enforcement should strategize to be more proactive and aware of these elevated occurence substance related incidents during this time and provide sufficient prevention.
+
+
