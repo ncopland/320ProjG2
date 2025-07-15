@@ -14,6 +14,7 @@ library(lubridate)    # for date handling
 library(ggTimeSeries) # for time series plots
 library(viridis)      # color palettes
 library(gganimate)
+library(gifski)
 
 # install.packages("ggTimeSeries")
 # install.packages("gganimate")
@@ -345,16 +346,39 @@ for (yr in years) {
       'ArrestDate',
       'n'
     ) +
-    scale_fill_gradient(low = "white", high = "red", name = "Arrests", na.value = NA) +
+    scale_fill_gradient(low = "white", high = "red", name = "Arrests", na.value = "grey") +
     labs(
       title = sprintf("Calendar Heatmap of Daily Arrests — Year: %s", yr),
-      subtitle = "Darker colors indicate more arrests"
+      subtitle = "Darker colors indicate more arrests, grey = missing data"
     ) +
     theme_minimal(base_size = 14)
   
  # ggsave(sprintf("calendar_%s.png", yr), plot = p, width = 12, height = 8)
 }
 
+```
+```{r}
+imgs <- list.files(
+  path = "heat map calendar for each year",
+  pattern = "\\.png$",
+  full.names = TRUE
+) |> sort()
+
+length(imgs)
+output_gif <- "calendar_heatmap_animation.gif"
+
+gifski(
+  png_files = imgs,
+  gif_file = output_gif,
+  delay = 2,   # adjust speed (seconds per frame)
+  width = 1200,
+  height = 800,
+  loop = TRUE
+)
+
+```
+```{r, echo=FALSE, out.width='100%'}
+knitr::include_graphics("calendar_heatmap_animation.gif")
 ```
 
 
