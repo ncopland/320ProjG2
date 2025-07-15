@@ -1,0 +1,40 @@
+---
+title: "Fixing Latitude and Longitudes"
+output: html_document
+date: "2025-07-03"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,warning=F)
+options(scipen=999)
+library(tidyverse)    #Essential Functions
+library(rvest)
+library(devtools)
+library(noncensus)
+library(ggplot2)
+```
+
+```{r cars}
+
+#In both datasets there are a few thousand observations where the latitude and longitude were swapped. This code fixes that for both datasets.
+
+arrests = read.csv('/Users/emmettleo/Downloads/Police Reporting Project/Police_Arrests_Clean.csv')
+for(i in 1:length(arrests$latitude)){
+  x=arrests$latitude[i]
+  if(arrests$latitude[i]<arrests$longitude[i]){
+    arrests$latitude[i]=arrests$longitude[i]
+    arrests$longitude[i]=x
+  }
+}
+write.csv(arrests, "Police_Arrests_Clean2.csv", row.names = FALSE)
+arrests = read.csv('/Users/emmettleo/Downloads/Police Reporting Project/Police_Incidents_Clean.csv')
+for(i in 1:length(arrests$latitude)){
+  x=arrests$latitude[i]
+  if(arrests$latitude[i]<arrests$longitude[i]){
+    arrests$latitude[i]=arrests$longitude[i]
+    arrests$longitude[i]=x
+  }
+}
+write.csv(arrests, "Police_Incidents_Clean2.csv2", row.names = FALSE)
+```
