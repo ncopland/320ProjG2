@@ -1,0 +1,73 @@
+---
+title: "EDA"
+author: "Sarah Bazari"
+date: "2025-07-15"
+output: html_document
+---
+
+*** Questions 8 and 10 ***
+
+```{r}
+library(readr)
+library(tidyverse)
+data = read_csv("Police_Arrests_Clean.csv")
+```
+
+```{r}
+# 10) Which zip code in Chapel Hill experiences the most arrests? And accordingly, what classifications of offenses are most common to each zip code?
+
+# filters just for chapel hill
+chapel_hill_arrests = data %>%
+  filter(City == "CHAPEL HILL")
+# count arrests per zipcode
+zip_counts = chapel_hill_arrests %>%
+  count(Zip, sort = TRUE)
+
+zip_counts
+```
+
+```{r}
+# count most common charges per zipcode
+offense_by_zip = chapel_hill_arrests %>%
+  count(Zip, Charge, sort = TRUE)
+
+# see the top offenses per zip
+offense_by_zip %>%
+  group_by(Zip) %>%
+  slice_max(n, n = 3) %>% # top 3 per zip
+  arrange(Zip, desc(n))
+```
+```{r}
+# visualiztion bar plot
+
+ggplot(zip_counts, aes(reorder(as.character(Zip), -n), y = n)) +
+  geom_col(fill = "red") +
+  labs(title = "Arrests by Zip Code in Chapel Hill",
+       x = "Zip", y = "Number of Arrests") +
+  theme_minimal() 
+```
+
+```{r}
+# 8) How does the presence of drugs or alcohol at the time of arrest vary by gender, and which gender shows a higher proportion of substance-involved arrests?
+
+substance_by_gender = data %>%
+  filter(!is.na(Gender), !is.na(Drugs_Alcohol)) %>%
+  count(Gender, Drugs_Alcohol) %>%
+  group_by(Gender) %>%
+  mutate(Proportion = n / sum(n)) %>%
+  ungroup()
+
+substance_by_gender
+```
+
+```{r}
+# visualiztion 
+
+ggplot(substance_by_gender, aes(x = Gender, y = Proportion, fill = Drugs_Alcohol)) +
+  geom_col(position = "dodge") +
+  labs(title = "Substance-Involved Arrests by Gender",
+       x = "Gender", y = "Proportion of Arrests",
+       fill = "Drugs or Alcohol Present") +
+  theme_minimal()
+```
+
