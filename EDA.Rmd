@@ -41,17 +41,30 @@ offense_by_zip %>%
 # visualiztion bar plot
 
 ggplot(zip_counts, aes(reorder(as.character(Zip), -n), y = n)) +
-  geom_col(fill = "red") +
-  labs(title = "Arrests by Zip Code in Chapel Hill",
-       x = "Zip", y = "Number of Arrests") +
-  theme_minimal() 
+  geom_col(fill = "#E63946", width = 0.7) +  # Nice deep red tone
+  labs(
+    title = "Number of Arrests by Zip Code in Chapel Hill",
+    subtitle = "Zip codes with the highest arrest counts shown in descending order",
+    x = "Zip Code",
+    y = "Number of Arrests"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12, color = "gray40"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 12),
+    axis.text.y = element_text(size = 12),
+    axis.title = element_text(face = "bold"),
+    plot.margin = margin(10, 20, 10, 10)
+  )
 ```
 
 ```{r}
 # 8) How does the presence of drugs or alcohol at the time of arrest vary by gender, and which gender shows a higher proportion of substance-involved arrests?
 
 substance_by_gender = data %>%
-  filter(!is.na(Gender), !is.na(Drugs_Alcohol)) %>%
+  filter(Gender %in% c("M", "F"),
+         Drugs_Alcohol %in% c("Y", "N")) %>%
   count(Gender, Drugs_Alcohol) %>%
   group_by(Gender) %>%
   mutate(Proportion = n / sum(n)) %>%
@@ -65,9 +78,26 @@ substance_by_gender
 
 ggplot(substance_by_gender, aes(x = Gender, y = Proportion, fill = Drugs_Alcohol)) +
   geom_col(position = "dodge") +
-  labs(title = "Substance-Involved Arrests by Gender",
-       x = "Gender", y = "Proportion of Arrests",
-       fill = "Drugs or Alcohol Present") +
-  theme_minimal()
+  scale_fill_manual(
+    values = c("Y" = "#1b9e77", "N" = "#d95f02"),
+    labels = c("Y" = "Yes", "N" = "No")
+  ) +
+  labs(
+    title = "Proportion of Arrests Involving Drugs or Alcohol by Gender",
+    subtitle = "Includes only arrests with known gender and substance info",
+    x = "Gender",
+    y = "Proportion of Arrests",
+    fill = "Substance Present?"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12, color = "gray40"),
+    axis.text.x = element_text(face = "bold"),
+    legend.position = "top",
+    legend.title = element_text(face = "bold")
+  ) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1))
+
 ```
 
