@@ -16,6 +16,8 @@ library(viridis)      # color palettes
 library(gganimate)
 library(gifski)
 library(ggmap)
+library(maps)
+library(tigris)
 
 # install.packages("ggTimeSeries")
 # install.packages("gganimate")
@@ -23,8 +25,6 @@ library(ggmap)
 # install.packages("transformr") # required by gganimate
 ```
 
-
-# Importing RAW .csv
 ```{r}
 Arrests <- read_csv("Police_Arrests_Clean.csv")
 Incidents <- read_csv("Police_Incidents_Clean.csv")
@@ -393,6 +393,175 @@ Incidents <- Incidents %>%
   ) %>%
   filter(!is.na(Latitude) & !is.na(Longitude)) # keep valid rows
 ```
+
+```{r}
+#new cleaned dataset pulled from github
+ArrestsE <- read_csv("Police_Arrests_Clean2.csv")
+ch= as.data.frame(filter(places(state= 'NC'), NAME=='Chapel Hill')$geometry[[1]][[1]][[1]])
+names(ArrestsE)
+```
+```{r, echo=F, eval=F}
+# Create folder to save plots
+if (!dir.exists("monthly_maps")) dir.create("monthly_maps")
+
+# Unique year-month combinations
+year_months <- Arrests %>%
+  filter(!is.na(year), !is.na(month_num)) %>%   
+  distinct(year, month_num) %>%
+  arrange(year, month_num)
+
+# Loop through year-month
+for(i in seq_len(nrow(year_months))) {
+  y <- year_months$year[i]
+  m <- year_months$month_num[i]
+  
+  # subset data for that month
+  data_subset <- Arrests %>%
+    filter(year == y, month_num == m)
+  
+  cat(sprintf("Rendering: %d-%02d with %d rows\n", y, m, nrow(data_subset)))
+  
+  
+  if (nrow(data_subset) == 0) next  # skip if empty
+  
+ p <- ggplot() +
+    geom_path(data = ch, aes(x = V1, y = V2), color = "black") +
+    geom_point(data = data_subset,
+               aes(x = longitude, y = latitude, color = Arrest_Type),
+               alpha = 0.7, size = 1.5) +
+    coord_quickmap(xlim = c(-79.09, -78.99), ylim = c(35.86, 35.99)) +
+    labs(
+      title = "Arrests in Chapel Hill",
+      subtitle = sprintf("Year: %d  Month: %02d", y, m),
+      x = "Longitude", y = "Latitude", color = "Arrest Type"
+    ) +
+    theme_minimal()
+  
+  ggsave(
+    filename = sprintf("monthly_maps/arrests_%d_%02d.png", y, m),
+    plot = p, width = 8, height = 6
+  )
+}
+
+
+# list all PNGs in the folder
+pngs <- list.files(
+  path = "monthly_maps",
+  pattern = "\\.png$",
+  full.names = TRUE
+)
+
+# sort properly
+pngs_sorted <- pngs %>%
+  tibble(path = .) %>%
+  mutate(
+    fname = basename(path),
+    year = as.numeric(str_extract(fname, "\\d{4}")),
+    month = as.numeric(str_extract(fname, "_(\\d{2})\\.png$", group = 1))
+  ) %>%
+  arrange(year, month) %>%
+  pull(path)
+
+gifski(
+  png_files = pngs_sorted,
+  gif_file = "arrests_map_animation_with_kind.gif",
+  width = 1200,
+  height = 800,
+  delay = 2,    # seconds per frame
+  loop = TRUE
+)
+```
+```{r, echo=FALSE, out.width='100%'}
+knitr::include_graphics("arrests_map_animation_with_kind.gif")
+```
+
+
+
+
+# Loops of ARREST_COUNT 2010-2024 each month (na.omit)
+
+```{r, echo=T, eval=T}
+library(dplyr)
+library(ggplot2)
+
+# create output folder if it doesn't exist
+if (!dir.exists("maps_2010")) dir.create("maps_2010")
+
+# loop through months 1 to 12
+for (m in 1:12) {
+  month_name <- month.abb[m]  # "Jan", "Feb", etc.
+  
+  freq_grid <- Arrests %>%
+    filter(year == 2010, month == month_name) %>% 
+    mutate(
+      rlat = round(latitude * 200) / 200,
+      rlon = round(longitude * 200) / 200
+    ) %>%
+    group_by(rlat, rlon) %>%
+    summarize(n = n(), .groups = "drop")
+  
+  if (nrow(freq_grid) == 0) next
+  
+  p <- ggplot() +
+    geom_tile(data = freq_grid, aes(x = rlon, y = rlat, fill = n)) +
+    geom_path(data = ch, aes(x = V1, y = V2), color = "black") +
+    coord_quickmap(xlim = c(-79.09, -78.99), ylim = c(35.86, 35.99)) +
+    labs(
+      title = "Arrest Frequency in Chapel Hill",
+      subtitle = sprintf("2010 - Month: %s", month_name),
+      fill = "Arrest Count",
+      x = "Longitude",
+      y = "Latitude"
+    ) +
+    scale_fill_viridis_c() +
+    theme_minimal()
+  
+#  ggsave(filename = sprintf("maps_2010/arrests_2010_%s.png", month_name),plot = p, width = 8, height = 6)
+  
+}
+
+
+# get all PNGs recursively
+pngs <- list.files(
+  path = "yearly_maps", 
+  pattern = "\\.png$", 
+  recursive = TRUE, 
+  full.names = TRUE
+)
+
+# sort files by year and month
+pngs_sorted <- pngs[order(pngs)]  # assumes your files are named arrests_YYYY_MMM.png
+
+# order chronologically
+month_order <- setNames(1:12, month.abb)
+
+pngs_sorted <- pngs %>%
+  tibble(path = .) %>%
+  mutate(
+    fname = basename(path),
+    year = as.numeric(stringr::str_extract(fname, "\\d{4}")),
+    month_str = stringr::str_extract(fname, paste(month.abb, collapse = "|")),
+    month_num = month_order[month_str]
+  ) %>%
+  arrange(year, month_num) %>%
+  pull(path)
+
+gifski(
+  png_files = pngs_sorted,
+  gif_file = "all_years_arrests.gif",
+  width = 1200,
+  height = 800,
+  delay = 2,   # seconds per frame
+  loop = TRUE
+)
+
+```
+```{r, echo=FALSE, out.width='100%'}
+knitr::include_graphics("all_years_arrests.gif")
+```
+
+
+
 
 
 
