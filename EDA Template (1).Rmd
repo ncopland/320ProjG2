@@ -1,0 +1,268 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(leaflet)
+
+# Import Data Below
+police_arrests = read_csv("Police_Arrests_Clean2.csv")
+```
+
+# Creator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Interpreter: Mariana Rodriguez-Pacheco
+
+### Q1: Is there a pattern of “CONSUME ALCOHOLIC BEVERAGE LESS THAN 21”  and “DRUG -” related crimes in Chapel Hill, and on which streets (excluding house numbers) are these arrests most concentrated?
+
+```{r}
+drug_alc_data = police_arrests %>%
+  filter(Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG")) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(20)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = drug_alc_data$longitude, lat = drug_alc_data$latitude, radius = drug_alc_data$Count / 2)
+```
+
+
+### Q2: Are any age groups (e.g., young: 18–25, middle-aged: 26–45, older: 46+) strongly associated with a specific type of charge?
+
+```{r}
+age = police_arrests$Age
+age_group = c()
+
+for (i in 1:length(age)) {
+  if (is.na(age[i])) {
+    age_group = c(age_group, "Unknown")
+  } else if (age[i] <= 25) {
+    age_group = c(age_group, "Young")
+  } else if (age[i] <= 45) {
+    age_group = c(age_group, "Middle-aged")
+  } else {
+    age_group = c(age_group, "Older")
+  }
+}
+
+age_group = factor(age_group, levels = c("Young", "Middle-aged", "Older", "Unknown"))
+police_arrests = mutate(police_arrests, Age_Group = age_group)
+```
+
+```{r}
+top_10_data = police_arrests %>%
+  group_by(Age_Group, Charge) %>%
+  summarise(Count = n()) %>%
+  mutate(Proportion = Count / sum(Count)) %>%
+  arrange(Age_Group, desc(Proportion)) %>%
+  mutate(Rank = min_rank(desc(Proportion))) %>%
+  filter(Rank <= 10)
+```
+
+```{r}
+ggplot(top_10_data) +
+  geom_bar(aes(x = reorder(Charge, -Proportion), y = Proportion, fill = Age_Group), stat = "identity") +
+  facet_wrap(~Age_Group, nrow = 1) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) +
+  labs(title = "Top 10 Charges by Age Group", y = "Proportion", x = "Charge")
+```
+
+# Orator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Deliverer: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: What factors might explain why trespassing charges are more common among older individuals?
+- Q2: Do institutional locations like schools appear to influence where alcohol and drug-related arrests are recorded?
+- Q3: Do the characteristics of arrests in the “Unknown” age group and their concentration at the Chapel Hill Police Department suggest that these cases involve minors, and what might explain the high frequency of alcohol and drug related charges at this location?
+- Q4: Why is there a sharp drop in total arrests in 2021 compared to other years, does that correlate with the pandemic?
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES: We decided to investigate Q3 and Q4 in further detail.
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+#### Question 3
+```{r}
+uknown_age_data = police_arrests %>%
+  filter(is.na(Age)) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(20)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = uknown_age_data$longitude, lat = uknown_age_data$latitude, radius = uknown_age_data$Count / 2)
+```
+
+```{r}
+police_department_data = filter(police_arrests, Street == "828 MARTIN LUTHER KING JR BLVD", Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG"))
+
+ggplot(police_department_data)+
+  geom_bar(aes(x = Arrest_Type))
+```
+
+---
+#### Question 4
+```{r}
+#checking why no spring and summer in 2020
+# List of all years & months in your data
+
+all_months <- month.abb
+
+# All year-month combinations
+all_combinations <- expand_grid(
+  year = unique(Arrests$year),
+  month = all_months
+)
+
+# Actual counts
+actual_counts <- Arrests %>%
+  count(year, month)
+
+# Convert both month columns to character explicitly
+all_combinations <- all_combinations %>%
+  mutate(month = as.character(month))
+
+actual_counts <- actual_counts %>%
+  mutate(month = as.character(month))
+
+# Left join + fill missing with 0
+complete_counts <- all_combinations %>%
+  left_join(actual_counts, by = c("year", "month")) %>%
+  mutate(n = replace_na(n, 0)) %>%
+  arrange(year, match(month, all_months))
+
+# Show missing months
+missing_months <- complete_counts %>% filter(n == 0)
+
+print(missing_months)
+
+missing_months %>%
+  kable("html", align = "lccrr") %>%
+  kable_styling(full_width = TRUE)
+
+```
+
+```{r}
+
+# Prepare data
+daily_arrests <- Arrests %>%
+  filter(!is.na(ArrestDate)) %>%
+  count(ArrestDate) %>%
+  mutate(year = lubridate::year(ArrestDate))
+
+# Get years
+years <- sort(unique(daily_arrests$year))
+
+# Loop: save PNG for each year
+for (yr in years) {
+  cat("Rendering year:", yr, "\n")
+  
+  p <- ggplot_calendar_heatmap(
+      daily_arrests %>% filter(year == yr),
+      'ArrestDate',
+      'n'
+    ) +
+    scale_fill_gradient(low = "white", high = "red", name = "Arrests", na.value = "grey") +
+    labs(
+      title = sprintf("Calendar Heatmap of Daily Arrests — Year: %s", yr),
+      subtitle = "Darker colors indicate more arrests, grey = missing data"
+    ) +
+    theme_minimal(base_size = 14)
+  
+ # ggsave(sprintf("calendar_%s.png", yr), plot = p, width = 12, height = 8)
+}
+
+```
+```{r}
+imgs <- list.files(
+  path = "heat map calendar for each year",
+  pattern = "\\.png$",
+  full.names = TRUE
+) |> sort()
+
+length(imgs)
+output_gif <- "calendar_heatmap_animation.gif"
+
+gifski(
+  png_files = imgs,
+  gif_file = output_gif,
+  delay = 2,   # adjust speed (seconds per frame)
+  width = 1200,
+  height = 800,
+  loop = TRUE
+)
+
+```
+```{r, echo=FALSE, out.width='100%'}
+knitr::include_graphics("calendar_heatmap_animation.gif")
+```
+
+
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY. 
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+In investigating the initial questions, I found that alcohol and drug related arrests in Chapel Hill were geographically concentrated in specific areas: East Chapel Hill High School, Downtown Chapel Hill, and, surprisingly, the Chapel Hill Police Department. This pattern was consistent with expectations around underage drinking and drug use occurring near high schools and the University of North Carolina at Chapel Hill, but the high arrest count at the police department was unexpected for me. Additionally, I learned that certain charges were more common within specific age groups. Young and middle-aged individuals were most often charged with impaired driving and failure to appear in court, while older individuals showed a higher rate of open container and trespassing charges. These findings raised interesting questions about why some charges appear more frequently in older age groups and what role public institutions might play in arrest patterns.
+
+
+    To explore these patterns further, we investigated whether the “Unknown” age group may include minors and why there was a high concentration of drug and alcohol charges at the Chapel Hill Police Department’s address. We found that the “Unknown” group had a high number of underage drinking and marijuana-related charges, and these records often lacked details like age, race, and gender. Many of these arrests also occurred near schools or the police department, suggesting that they may involve minors whose information is legally protected. Additionally, examining arrests at the police department revealed that most were labeled as “Summoned/Cited” rather than physical detainments. This implies that the address may reflect the location where citations were processed, not necessarily where offenses occurred. Together, these findings suggest that a combination of data protection practices and recording conventions could explain both the anonymity in age and the arrest clustering at the police station. From the first plot investigating question 4, the sharp decline in arrests in 2021 coincides with missing data for several months of that year. According to the missing-months table, arrests were not recorded (or records are missing) for months such as April–September 2021. Therefore, the drop is at least partially attributable to incomplete data rather than a real drop in arrest activity. And from the animated heatmap, We can see the trends in arrests over the previous 15 years by looking at the calendar heatmap GIF, which cycles through all years and months in a chronological manner. The heatmaps' color saturation shows the number of arrests; more arrests are indicated by darker red. Most months have at least some activity over the years, but the red's intensity varies, indicating variations in the number of arrests over time. Many months appear grey, indicating missing data for those periods, especially during COVID years. The dramatic decline in annual arrests during the trend years is explained by this visual evidence. The animation illustrates the annual and seasonal trends in arrests while also drawing attention to the data gaps.
+
+
+
