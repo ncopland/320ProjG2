@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(leaflet)
+library(caret)
+library(randomForest)
 
 # Import Data Below
 police_arrests = read_csv("Police_Arrests_Clean2.csv")
@@ -166,4 +168,46 @@ PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP Q
 
 
 To explore these patterns further, we investigated whether the “Unknown” age group may include minors and why there was a high concentration of drug and alcohol charges at the Chapel Hill Police Department’s address. We found that the “Unknown” group had a high number of underage drinking and marijuana-related charges, and these records often lacked details like age, race, and gender. Many of these arrests also occurred near schools or the police department, suggesting that they may involve minors whose information is legally protected. Additionally, examining arrests at the police department revealed that most were labeled as “Summoned/Cited” rather than physical detainments. This implies that the address may reflect the location where citations were processed, not necessarily where offenses occurred. Together, these findings suggest that a combination of data protection practices and recording conventions could explain both the anonymity in age and the arrest clustering at the police station.
+
+```{r}
+police_arrests$Month_Day = as.numeric(format(police_arrests$Arrest_Date, "%m%d"))
+police_arrests$Semester = NA
+
+for(i in 1:nrow(police_arrests)) {
+  if(is.na(police_arrests$Month_Day[i])) {
+    police_arrests$Semester[i] = NA
+  } else if(514 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 729) {
+    police_arrests$Semester[i] = "Summer"
+  } else if(817 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 1214) {
+    police_arrests$Semester[i] = "Fall"
+  } else if(107 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 509) {
+    police_arrests$Semester[i] = "Spring"
+  } else {
+    police_arrests$Semester[i] = "Break"
+  }
+}
+
+police_arrests$Hour = as.numeric(format(police_arrests$Arrest_Date, "%H"))
+
+write.csv(police_arrests, "model_cleaned_police_arrests.csv", row.names = FALSE)
+
+model_data = police_arrests %>% 
+  select(Hour, Zip, Street, Month_Day, season, Arrest_Type, Drugs_Alcohol, Semester) %>%
+  na.omit()
+
+#rf_model <- randomForest(
+#  Hour ~ Zip + Street + Month_Day + season + Arrest_Type + Drugs_Alcohol + Semester,
+#  data = model_data,
+#  ntree = 100,
+#  importance = TRUE
+#)
+
+#lm_model <- train(
+#  hour ~ ..., data = df, method = "lm", trControl = train_control
+#)
+
+#cv_model = crossv_kfold(data = model_data, k = 25)
+
+```
+
 
