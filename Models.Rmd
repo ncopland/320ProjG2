@@ -1,0 +1,428 @@
+---
+title: "Models"
+author: "Nicholas Copland"
+date: "2025-07-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyverse)
+library(ggmap)
+library(rstudioapi)
+
+arrests = read.csv("C:/Users/Nicholas Copland/OneDrive - University of North Carolina at Chapel Hill/STOR_320/Final/Police_Arrests_Clean2.csv")
+```
+
+```{r}
+arrests = arrests %>%
+  mutate(
+    Arrest_Dttm = parse_date_time(Arrest_Date, orders = c("ymd HMS", "ymd HM", "mdy HMS", "mdy HM")),
+    Date = as_date(Arrest_Dttm),
+    Time = hms(format(Arrest_Dttm, "%H:%M:%S"))
+  )
+```
+
+
+```{r, eval=FALSE}
+
+register_google(key = "")
+
+chapel_hill_map <- get_map(location = "Chapel Hill, NC", zoom = 13)
+
+ggmap(chapel_hill_map) +
+  stat_density2d(
+    data = arrests,
+    aes(x = longitude, y = latitude, fill = ..level.., alpha = ..level..),
+    geom = "polygon"
+  ) +
+  scale_fill_viridis_c() +
+  guides(alpha = "none") +
+  labs(title = "Chapel Hill Arrest Heat Map")
+```
+
+```{r}
+uknown_age_data = arrests %>%
+  filter(is.na(Age)) %>%
+  group_by(year) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count))
+
+uknown_age_data
+
+agena = arrests %>%
+  filter(is.na(Age)) %>%
+  arrange(., desc(year))
+agena
+
+ 
+```
+
+
+```{r, eval=FALSE}
+library(ggmap)
+
+register_stadiamaps(key = "")
+
+chapel_map <- get_stadiamap(
+  bbox = c(left = -79.1, bottom = 35.87, right = -78.99, top = 36), 
+  zoom = 13,
+  maptype = "stamen_toner_lite"
+)
+
+ggmap(chapel_map) +
+  geom_point(data = arrests, aes(x = longitude, y = latitude), alpha = 0.3) +
+  labs(title = "Chapel Hill Arrests Map with OpenStreetMap Background")
+```
+```{r, eval = FALSE}
+ggmap(chapel_map) + 
+    geom_point(arrests, mapping = aes(x = longitude, y = latitude), alpha = 0.3, size = 0.3) +
+  labs(
+    title = "Map of Arrest Locations in Chapel Hill 2015-2024",
+    x = "Longitude",
+    y = "Latitude",
+    ) +
+  theme_minimal()
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(janitor)
+library(nnet)      # for multinom
+library(caret)  # for confusionMatrix and resampling
+library(e1071)     # for SVM
+
+franklin_data <- arrests %>%
+  clean_names() %>%
+  filter(str_detect(street, regex("FRANKLIN", ignore_case = TRUE)))
+
+#franklin_data %>%
+#  mutate(
+#    college_age = ifelse(Age >= 18 & Age <= 24, 1, 0),
+#  ) %>% 
+ # summarize(
+#    College_Aged = sum(college_age == 1),
+#    Alcohol/Drugs = sum(Alcohol_Drugs == "Y")
+#  )
+```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+franklin_daily <- arrests %>%
+  filter(str_detect(Street, regex("FRANKLIN", ignore_case = TRUE))) %>%
+  mutate(
+    arrest_dttm = parse_date_time(Arrest_Date, orders = c("ymd HMS", "mdy HMS", "mdy HM", "ymd HM")),
+    date = as_date(arrest_dttm),
+    day_of_year = yday(date),
+    month = month(date, label = TRUE),
+    Weekday = wday(date, label = TRUE),
+    is_weekend = Weekday %in% c("Sat", "Sun"),
+    season = case_when(
+      month %in% c("Dec", "Jan", "Feb") ~ "Winter",
+      month %in% c("Mar", "Apr", "May") ~ "Spring",
+      month %in% c("Jun", "Jul", "Aug") ~ "Summer",
+      TRUE ~ "Fall"
+    ),
+    unc_in_session = month(date) %in% c(1:5, 8:11)  # Rough approximation
+  ) %>%
+  group_by(date) %>%
+  summarise(
+    Arrest_Count = n(),
+    DayOfYear = first(day_of_year),
+    Month = first(month),
+    Weekday = first(Weekday),
+    Is_Weekend = first(is_weekend),
+    Season = first(season),
+    UNC_in_session = first(unc_in_session)
+  ) %>%
+  ungroup() %>%
+  mutate(Arrest_Happened = ifelse(Arrest_Count > 0, 1, 0))
+
+franklin_daily <- franklin_daily %>%
+  drop_na(Month, Weekday, Is_Weekend, Season, UNC_in_session)
+```
+
+```{r}
+
+set.seed(42)  # reproducibility
+
+franklin_model_data <- franklin_daily %>%
+  drop_na(Month, Weekday, Is_Weekend, Season, UNC_in_session)
+
+sample_indices <- sample(1:nrow(franklin_model_data), size = 0.8 * nrow(franklin_model_data))
+train_data <- franklin_model_data[sample_indices, ]
+test_data <- franklin_model_data[-sample_indices, ]
+```
+
+```{r}
+poisson_model_train <- glm(
+  Arrest_Count ~ Month + Weekday + Is_Weekend + Season + UNC_in_session,
+  data = train_data,
+  family = "poisson"
+)
+```
+
+```{r}
+test_data <- test_data %>%
+  mutate(Pred_Arrest_Count = predict(poisson_model_train, newdata = ., type = "response"))
+```
+
+```{r}
+library(Metrics)
+
+mae_value <- mae(test_data$Arrest_Count, test_data$Pred_Arrest_Count)
+rmse_value <- rmse(test_data$Arrest_Count, test_data$Pred_Arrest_Count)
+
+cat("MAE:", round(mae_value, 3), "\nRMSE:", round(rmse_value, 3))
+```
+
+
+```{r}
+ggplot(test_data, aes(x = DayOfYear)) +
+  geom_line(aes(y = Arrest_Count), color = "firebrick", size = 1.2, alpha = 0.6) +
+  geom_line(aes(y = Pred_Arrest_Count), color = "steelblue", size = 1) +
+  labs(
+    title = "Test Set: Actual vs Predicted Arrest Counts on Franklin Street",
+    subtitle = paste("MAE:", round(mae_value, 2), "| RMSE:", round(rmse_value, 2)),
+    x = "Day of Year",
+    y = "Arrest Count"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+```{r}
+mean_model <- glm(Arrest_Count ~ 1, data = train_data, family = "poisson")
+test_data$Pred_Mean <- predict(mean_model, newdata = test_data, type = "response")
+```
+
+```{r}
+dow_model <- glm(Arrest_Count ~ Weekday, data = train_data, family = "poisson")
+test_data$Pred_DOW <- predict(dow_model, newdata = test_data, type = "response")
+```
+
+```{r}
+month_model <- glm(Arrest_Count ~ Month, data = train_data, family = "poisson")
+test_data$Pred_Month <- predict(month_model, newdata = test_data, type = "response")
+```
+
+```{r}
+Weekday_unc_model <- glm(Arrest_Count ~ Weekday + UNC_in_session, data = train_data, family = "poisson")
+test_data$Pred_Weekday_UNC <- predict(Weekday_unc_model, newdata = test_data, type = "response")
+```
+
+```{r}
+weekend_model <- glm(Arrest_Count ~ Is_Weekend, data = train_data, family = "poisson")
+test_data$Pred_Weekend <- predict(weekend_model, newdata = test_data, type = "response")
+```
+
+```{r}
+library(tidyr)
+
+test_long <- test_data %>%
+  select(DayOfYear, Arrest_Count, 
+         Pred_Mean, Pred_DOW, Pred_Month, Pred_Weekday_UNC, Pred_Weekend) %>%
+  pivot_longer(cols = starts_with("Pred_"), names_to = "Model", values_to = "Predicted")
+
+ggplot(test_long, aes(x = DayOfYear)) +
+  geom_line(aes(y = Arrest_Count), color = "black", size = 1, alpha = 0.5) +
+  geom_line(aes(y = Predicted, color = Model), size = 1) +
+  labs(
+    title = "Actual vs Predicted Arrest Counts on Franklin Street (Test Set)",
+    subtitle = "Comparing Simplified Models",
+    y = "Arrest Count", x = "Day of Year"
+  ) +
+  scale_color_brewer(palette = "Set1") +
+  theme_minimal(base_size = 13)
+
+library(Metrics)
+
+model_names <- c("Pred_Mean", "Pred_DOW", "Pred_Month", "Pred_Weekday_UNC", "Pred_Weekend")
+
+mae_df <- tibble(
+  Model = model_names,
+  MAE = sapply(model_names, function(m) {
+    mae(test_data$Arrest_Count, test_data[[m]])
+  })
+)
+
+mae_df %>% arrange(MAE)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# Rebuild and aggregate the daily data
+franklin_arrests <- arrests %>%
+  filter(str_detect(Street, regex("FRANKLIN", ignore_case = TRUE))) %>%
+  mutate(
+    Arrest_dttm = parse_date_time(Arrest_Date, orders = c("ymd HMS", "mdy HMS", "mdy HM", "ymd HM")),
+    Date = as_date(Arrest_dttm),
+    Year = year(Date),
+    Day_of_year = yday(Date),
+    Month = month(Date, label = TRUE),
+    Weekday = wday(Date, label = TRUE),
+    Is_Weekend = Weekday %in% c("Sat", "Sun"),
+    Season = case_when(
+      month %in% c("Dec", "Jan", "Feb") ~ "Winter",
+      month %in% c("Mar", "Apr", "May") ~ "Spring",
+      month %in% c("Jun", "Jul", "Aug") ~ "Summer",
+      month %in% c("Sep", "Oct", "Nov") ~ "Fall"
+    ),
+    UNC_in_session = month(Date) %in% c(1:5, 8:11)
+  ) %>%
+  drop_na(Month, Weekday, Is_Weekend, Season, UNC_in_session)
+
+# Rebuild and aggregate the daily data
+other_arrests <- arrests %>%
+  filter(!str_detect(Street, regex("FRANKLIN", ignore_case = TRUE))) %>%
+  mutate(
+    Arrest_dttm = parse_date_time(Arrest_Date, orders = c("ymd HMS", "mdy HMS", "mdy HM", "ymd HM")),
+    Date = as_date(Arrest_dttm),
+    Year = year(Date),
+    Day_of_year = yday(Date),
+    Month = month(Date, label = TRUE),
+    Weekday = wday(Date, label = TRUE),
+    Is_Weekend = Weekday %in% c("Sat", "Sun"),
+    Season = case_when(
+      month %in% c("Dec", "Jan", "Feb") ~ "Winter",
+      month %in% c("Mar", "Apr", "May") ~ "Spring",
+      month %in% c("Jun", "Jul", "Aug") ~ "Summer",
+      month %in% c("Sep", "Oct", "Nov") ~ "Fall"
+    ),
+    UNC_in_session = month(Date) %in% c(1:5, 8:11)
+  ) %>%
+  drop_na(Month, Weekday, Is_Weekend, Season, UNC_in_session)
+```
+
+```{r}
+Weekdayize = function(data){
+  data %>%
+  summarize(
+    Monday = sum(Weekday == "Mon"),
+    Tuesday = sum(Weekday == "Tue"),
+    Wednesday = sum(Weekday == "Wed"),
+    Thursday = sum(Weekday == "Thu"),
+    Friday = sum(Weekday == "Fri"),
+    Saturday = sum(Weekday == "Sat"),
+    Sunday = sum(Weekday == "Sun"),
+    Total = length(Weekday)
+  )
+}
+day_count = Weekdayize(franklin_arrests)
+
+alc_day_count = franklin_arrests %>%
+  filter(Drugs_Alcohol == "Y") %>%
+  Weekdayize
+
+other_day_count = Weekdayize(other_arrests)
+
+other_alc_day_count = other_arrests %>%
+  filter(Drugs_Alcohol == "Y") %>%
+  Weekdayize
+
+day_count = gather(day_count, key = "Weekday", value = "F_Arrests")
+alc_day_count = gather(alc_day_count, key = "Weekday", value = "F_Alcohol_or_Drugs")
+other_day_count = gather(other_day_count, key = "Weekday", value = "O_Arrests")
+other_alc_day_count = gather(other_alc_day_count, key = "Weekday", value = "O_Alcohol_or_Drugs")
+
+Franklin_Weekday = full_join(day_count, alc_day_count)
+Other_Weekday = full_join(other_day_count, other_alc_day_count)
+Franklin_vs_Other = full_join(Franklin_Weekday, Other_Weekday)
+Franklin_vs_Other = Franklin_vs_Other %>%
+  mutate(
+    PropF = F_Alcohol_or_Drugs / F_Arrests,
+    PropO = O_Alcohol_or_Drugs / O_Arrests,
+    Difference = PropF-PropO
+  )
+Franklin_vs_Other
+```
+
+
+```{r}
+franklin_daily  = franklin_arrests %>%
+  group_by(Date, Day_of_year, Year, Month, Weekday, Is_Weekend, Season, UNC_in_session) %>%
+  summarise(Arrest_Count = n(), .groups = "drop")
+
+avg_day_counts <- franklin_daily %>%
+  group_by(Day_of_year) %>%
+  summarise(Avg_Arrests = mean(Arrest_Count), .groups = "drop")
+
+avg_day_data <- franklin_daily %>%
+  left_join(avg_day_counts, by = "Day_of_year")
+```
+
+
+```{r}
+mod1 <- lm(Avg_Arrests ~ Month + Weekday, data = avg_day_data)
+avg_day_data$Pred_Mod_M_W <- predict(mod1)
+```
+
+```{r}
+mod2 <- lm(Avg_Arrests ~ Season + UNC_in_session, data = avg_day_data)
+avg_day_data$Pred_Mod_S_UNC <- predict(mod2)
+```
+
+```{r}
+mod3 <- lm(Avg_Arrests ~ Weekday + Is_Weekend + UNC_in_session, data = avg_day_data)
+avg_day_data$Pred_Mod_W_IsW_UNC <- predict(mod3)
+```
+
+```{r}
+mod4 <- lm(Avg_Arrests ~ Month + Is_Weekend, data = avg_day_data)
+avg_day_data$Pred_Mod_M_IsW <- predict(mod4)
+```
+
+```{r}
+avg_model <- lm(Avg_Arrests ~ Month + Weekday + Is_Weekend + Season + UNC_in_session, data = avg_day_data)
+
+avg_day_data$Pred_Mod_All <- predict(avg_model)
+```
+
+
+```{r}
+avg_day_long <- avg_day_data %>%
+  select(Day_of_year, Avg_Arrests, starts_with("Pred_")) %>%
+  pivot_longer(cols = starts_with("Pred_"), names_to = "Model", values_to = "Prediction")
+
+ggplot(avg_day_long, aes(x = Day_of_year)) +
+  geom_line(aes(y = Avg_Arrests), color = 'black', size = 1, alpha = 0.5) +
+  geom_line(aes(y = Prediction, color = Model), size = .5) +
+  scale_y_continuous(c(0,10)) + 
+  labs(
+    title = "Comparison of Models Predicting Avg Arrests on Franklin Street",
+    subtitle = "Models trained on average arrest counts per day of year",
+    x = "Day of Year",
+    y = "Average Arrests (Smoothed)",
+    color = "Model"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+```{r}
+library(Metrics)
+
+model_names <- c(names(select(avg_day_data, starts_with("Pred_"))))
+
+mae_df <- tibble(
+  Model = model_names,
+  MAE = sapply(model_names, function(m) {
+    mae(avg_day_data$Avg_Arrests, avg_day_data[[m]])
+  }),
+  RMSE = sapply(model_names, function(m) {
+    rmse(avg_day_data$Avg_Arrests, avg_day_data[[m]])
+  })
+)
+
+mae_df %>% arrange(RMSE)
+```
+
