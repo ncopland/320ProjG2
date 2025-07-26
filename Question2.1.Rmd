@@ -1,0 +1,108 @@
+---
+title: "projectQuestion2.1"
+output: html_document
+date: "2025-07-25"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+```{r 2.1}
+library(tidyverse)
+library(scales)
+library(purrr)
+library(dplyr)
+library(readr)
+library(ggplot2)
+
+DATA <- read_csv("Police_Arrests_Clean.csv", col_types = cols())
+
+# Create underage column
+arrests <- DATA %>%
+  mutate(Underage = if_else(is.na(Age), "Underage", "Non-Underage"))
+
+arrest_cluster_data <- arrests %>%
+  group_by(Underage, Arrest_Type) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Underage) %>%
+  mutate(Proportion = n / sum(n))
+```
+
+
+```{r 2.2}
+3
+ggplot(arrest_cluster_data, aes(x = Arrest_Type, y = Proportion, fill = Underage)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(aes(label = scales::percent(Proportion, accuracy = 0.1)),
+            position = position_dodge(width = 0.7),
+            vjust = -0.3, size = 3) +
+  scale_fill_manual(values = c("Underage" = "steelblue", "Non-Underage" = "red")) +
+  labs(title = "Arrest Type by Underage Status",
+       x = "Arrest Type", y = "Proportion",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+```{r}
+#Disposition by ages
+disposition_summary <- arrests %>%
+  group_by(Underage, Disposition) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Underage) %>%
+  mutate(Proportion = n / sum(n))
+
+ggplot(disposition_summary, aes(x = Disposition, y = Proportion, fill = Underage)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(aes(label = scales::percent(Proportion, accuracy = 0.1)),
+            position = position_dodge(width = 0.7),
+            vjust = -0.3, size = 3) +
+  scale_fill_manual(values = c("Underage" = "steelblue", "Non-Underage" = "red")) +
+  labs(title = "Disposition of All Arrests",
+       subtitle = "Comparing Underage vs Non-Underage Outcomes",
+       x = "Disposition", y = "Proportion",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+arrests <- DATA %>%
+  mutate(
+    Underage = if_else(is.na(Age), "Underage", "Non-Underage"),
+    Substance_Clean = case_when(
+      Drugs_Alcohol == "Y" ~ "Substance Involved",
+      Drugs_Alcohol %in% c("N", "U") ~ "No or Unknown",
+      TRUE ~ NA_character_
+    )
+  )
+ substance_summary <- arrests %>%
+  group_by(Underage, Substance_Clean) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Underage) %>%
+  mutate(Proportion = n / sum(n))
+ 
+ ggplot(substance_summary, aes(x = Substance_Clean, y = Proportion, fill = Underage)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(aes(label = scales::percent(Proportion, accuracy = 0.1)),
+            position = position_dodge(width = 0.7),
+            vjust = -0.3, size = 3) +
+  scale_fill_manual(values = c("Underage" = "steelblue", "Non-Underage" = "red")) +
+  labs(title = "Substance Involvement by Underage Status",
+       x = "Substance Involvement",
+       y = "Proportion of Arrests",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal()
+```
+  
+```{r}
+
+ 
+```
+
