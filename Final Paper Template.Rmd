@@ -27,6 +27,124 @@ IN LESS THAN 6 PARAGRAPHS FOR EACH OF THE TWO QUESTIONS, YOU SHOULD DESCRIBE THE
 IN LESS THAN 4 PARAGRAPHS, YOU SHOULD RESTATE YOUR QUESTIONS ALONG WITH YOUR CONCLUSIONS. THE PURPOSE OF THIS SECTION IS TO SUMMARIZE YOUR FINDINGS (SHORT), DEFEND THE IMPORTANCE OF YOUR RESULTS IN THE REAL WORLD (LONG), AND PROVIDE A ROADMAP FOR OTHERS TO CONTINUE THIS WORK (LONG). ARE YOUR CONCLUSIONS WHAT YOU EXPECTED OR UNUSUAL? WHY SHOULD SOMEONE CARE ABOUT THESE RESULTS? HOW COULD THESE RESULTS BE USED IN THE REAL WORLD? YOU SHOULD PROVIDE IDEAS ABOUT FUTURE DIRECTIONS ON WHERE YOUR MODELING COULD POSSIBLY BE IMPROVED. ARE THERE ANY METHODS YOU DIDN'T USE THAT MAY WORK BETTER? IS THERE DATA YOU DIDN'T HAVE ACCESS TO THAT MAY BE USEFUL IN THIS DATA ANALYSIS? 
 
 
+```{r}
+library(tidyverse)
+library(leaflet)
+library(caret)
+library(randomForest)
+library(cluster)
+
+police_arrests = read_csv("Police_Arrests_Clean2.csv")
+
+police_arrests$Month_Day = as.numeric(format(police_arrests$Arrest_Date, "%m%d"))
+police_arrests$Semester = NA
+
+for(i in 1:nrow(police_arrests)) {
+  if(is.na(police_arrests$Month_Day[i])) {
+    police_arrests$Semester[i] = NA
+  } else if(514 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 729) {
+    police_arrests$Semester[i] = "Summer"
+  } else if(817 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 1214) {
+    police_arrests$Semester[i] = "Fall"
+  } else if(107 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 509) {
+    police_arrests$Semester[i] = "Spring"
+  } else {
+    police_arrests$Semester[i] = "Break"
+  }
+}
+
+police_arrests$Hour = as.numeric(format(police_arrests$Arrest_Date, "%H"))
+police_arrests = mutate(police_arrests, 
+                        Season = as.factor(season), 
+                        Semester = as.factor(Semester))
+police_arrests$DayOfWeek = as.factor(weekdays(police_arrests$Arrest_Date))
+police_arrests$IsWeekend = as.factor(ifelse(police_arrests$DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+police_arrests$Arrest_Type = as.factor(police_arrests$Arrest_Type)
+police_arrests$Day = as.numeric(format(police_arrests$Arrest_Date, "%d"))
+police_arrests$Drugs_Alcohol = as.factor(police_arrests$Drugs_Alcohol)
+police_arrests$Race = as.factor(police_arrests$Race)
+police_arrests$Gender = as.factor(police_arrests$Gender)
+police_arrests$Franklin = as.factor(ifelse(str_detect(police_arrests$Street, regex("FRANKLIN", ignore_case = TRUE)), "Franklin", "Other"))
+
+write.csv(police_arrests, "model_cleaned_police_arrests.csv", row.names = FALSE)
+
+model_data = police_arrests %>% 
+  select(Hour, Zip, Month = month_num, Day, Season, Arrest_Type, Drugs_Alcohol, Semester, DayOfWeek, IsWeekend, latitude, longitude, year, Age, Race, Gender, Franklin) %>%
+  na.omit()
+
+lm_model = train(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + IsWeekend,
+  data = model_data,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 5)
+)
+
+knn_model = train(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester,
+  data = model_data,
+  method = "knn",
+  trControl = trainControl(method = "cv", number = 5),
+  tuneLength = 10
+)
+
+rf_model = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_model_simple = randomForest(
+    Hour ~ Month + Day + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Franklin,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_model_more = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude + year + Age + Franklin + Gender + Race,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+model_data$RF_Predictions = predict(rf_model)
+model_data$RF_simple_Predictions = predict(rf_model_simple)
+model_data$RF_more_Predictions = predict(rf_model_more)
+model_data$LM_Predictions = predict(lm_model)
+model_data$KNN_Predictions = predict(knn_model)
+
+evaluate_model <- function(actual, predicted) {
+  tibble(
+    MAE = mae(actual, predicted),
+    RMSE = rmse(actual, predicted)
+  )
+}
+
+mae_data <- rbind(
+  evaluate_model(model_data$Hour, model_data$RF_Predictions) %>%
+    mutate(Model = "RF - Base"),
+  
+  evaluate_model(model_data$Hour, model_data$RF_simple_Predictions) %>%
+    mutate(Model = "RF - Simple"),
+  
+  evaluate_model(model_data$Hour, model_data$RF_more_Predictions) %>%
+    mutate(Model = "RF - More"),
+  
+  evaluate_model(model_data$Hour, model_data$LM_Predictions) %>%
+    mutate(Model = "LM"), 
+  
+  evaluate_model(model_data$Hour, model_data$KNN_Predictions) %>%
+    mutate(Model = "KNN")
+) %>%
+  select(Model, MAE, RMSE)
+
+mae_data %>% arrange(RMSE)
+
+model_data = model_data %>%
+  mutate(Residuals = round(Hour - RF_Predictions,5)) %>%
+  select(Hour, RF_Predictions, Residuals, everything())
+```
 
 
 
