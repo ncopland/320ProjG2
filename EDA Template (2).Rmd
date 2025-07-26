@@ -1,0 +1,382 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(leaflet)
+library(caret)
+library(randomForest)
+library(cluster)
+
+# Import Data Below
+police_arrests = read_csv("Police_Arrests_Clean2.csv")
+```
+
+# Creator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Interpreter: Mariana Rodriguez-Pacheco
+
+### Q1: Is there a pattern of “CONSUME ALCOHOLIC BEVERAGE LESS THAN 21”  and “DRUG -” related crimes in Chapel Hill, and on which streets (excluding house numbers) are these arrests most concentrated?
+
+```{r}
+drug_alc_data = police_arrests %>%
+  filter(Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG")) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(20)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = drug_alc_data$longitude, lat = drug_alc_data$latitude, radius = drug_alc_data$Count / 2)
+```
+
+
+### Q2: Are any age groups (e.g., young: 18–25, middle-aged: 26–45, older: 46+) strongly associated with a specific type of charge?
+
+```{r}
+age = police_arrests$Age
+age_group = c()
+
+for (i in 1:length(age)) {
+  if (is.na(age[i])) {
+    age_group = c(age_group, "Unknown")
+  } else if (age[i] <= 25) {
+    age_group = c(age_group, "Young")
+  } else if (age[i] <= 45) {
+    age_group = c(age_group, "Middle-aged")
+  } else {
+    age_group = c(age_group, "Older")
+  }
+}
+
+age_group = factor(age_group, levels = c("Young", "Middle-aged", "Older", "Unknown"))
+police_arrests = mutate(police_arrests, Age_Group = age_group)
+```
+
+```{r}
+top_10_data = police_arrests %>%
+  group_by(Age_Group, Charge) %>%
+  summarise(Count = n()) %>%
+  mutate(Proportion = Count / sum(Count)) %>%
+  arrange(Age_Group, desc(Proportion)) %>%
+  mutate(Rank = min_rank(desc(Proportion))) %>%
+  filter(Rank <= 10)
+```
+
+```{r}
+ggplot(top_10_data) +
+  geom_bar(aes(x = reorder(Charge, -Proportion), y = Proportion, fill = Age_Group), stat = "identity") +
+  facet_wrap(~Age_Group, nrow = 1) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6)) +
+  labs(title = "Top 10 Charges by Age Group", y = "Proportion", x = "Charge")
+```
+
+# Orator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Deliverer: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: What factors might explain why trespassing charges are more common among older individuals?
+- Q2: Do institutional locations like schools appear to influence where alcohol and drug-related arrests are recorded?
+- Q3: Do the characteristics of arrests in the “Unknown” age group and their concentration at the Chapel Hill Police Department suggest that these cases involve minors, and what might explain the high frequency of alcohol and drug related charges at this location?
+- Q4: 
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES: We decided to investigate Q3 and Q4 in further detail.
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+```{r}
+uknown_age_data = police_arrests %>%
+  filter(is.na(Age)) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(20)
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = uknown_age_data$longitude, lat = uknown_age_data$latitude, radius = uknown_age_data$Count / 2)
+```
+
+```{r}
+police_department_data = filter(police_arrests, Street == "828 MARTIN LUTHER KING JR BLVD", Charge == "CONSUME ALCOHOLIC BEVERAGE LESS THAN 21" | str_detect(Charge, "DRUG"))
+
+ggplot(police_department_data)+
+  geom_bar(aes(x = Arrest_Type))
+```
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY. 
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+In investigating the initial questions, I found that alcohol and drug related arrests in Chapel Hill were geographically concentrated in specific areas: East Chapel Hill High School, Downtown Chapel Hill, and, surprisingly, the Chapel Hill Police Department. This pattern was consistent with expectations around underage drinking and drug use occurring near high schools and the University of North Carolina at Chapel Hill, but the high arrest count at the police department was unexpected for me. Additionally, I learned that certain charges were more common within specific age groups. Young and middle-aged individuals were most often charged with impaired driving and failure to appear in court, while older individuals showed a higher rate of open container and trespassing charges. These findings raised interesting questions about why some charges appear more frequently in older age groups and what role public institutions might play in arrest patterns.
+
+
+PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
+
+
+To explore these patterns further, we investigated whether the “Unknown” age group may include minors and why there was a high concentration of drug and alcohol charges at the Chapel Hill Police Department’s address. We found that the “Unknown” group had a high number of underage drinking and marijuana-related charges, and these records often lacked details like age, race, and gender. Many of these arrests also occurred near schools or the police department, suggesting that they may involve minors whose information is legally protected. Additionally, examining arrests at the police department revealed that most were labeled as “Summoned/Cited” rather than physical detainments. This implies that the address may reflect the location where citations were processed, not necessarily where offenses occurred. Together, these findings suggest that a combination of data protection practices and recording conventions could explain both the anonymity in age and the arrest clustering at the police station.
+
+```{r}
+library(Metrics)
+
+police_arrests$Month_Day = as.numeric(format(police_arrests$Arrest_Date, "%m%d"))
+police_arrests$Semester = NA
+
+for(i in 1:nrow(police_arrests)) {
+  if(is.na(police_arrests$Month_Day[i])) {
+    police_arrests$Semester[i] = NA
+  } else if(514 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 729) {
+    police_arrests$Semester[i] = "Summer"
+  } else if(817 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 1214) {
+    police_arrests$Semester[i] = "Fall"
+  } else if(107 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 509) {
+    police_arrests$Semester[i] = "Spring"
+  } else {
+    police_arrests$Semester[i] = "Break"
+  }
+}
+
+police_arrests$Hour = as.numeric(format(police_arrests$Arrest_Date, "%H"))
+police_arrests = mutate(police_arrests, 
+                        Season = as.factor(season), 
+                        Semester = as.factor(Semester))
+police_arrests$DayOfWeek = as.factor(weekdays(police_arrests$Arrest_Date))
+police_arrests$IsWeekend = as.factor(ifelse(police_arrests$DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+police_arrests$Arrest_Type = as.factor(police_arrests$Arrest_Type)
+police_arrests$Day = as.numeric(format(police_arrests$Arrest_Date, "%d"))
+police_arrests$Drugs_Alcohol = as.factor(police_arrests$Drugs_Alcohol)
+police_arrests$Race = as.factor(police_arrests$Race)
+police_arrests$Gender = as.factor(police_arrests$Gender)
+police_arrests$Franklin = as.factor(ifelse(str_detect(police_arrests$Street, regex("FRANKLIN", ignore_case = TRUE)), "Franklin", "Other"))
+
+write.csv(police_arrests, "model_cleaned_police_arrests.csv", row.names = FALSE)
+
+model_data = police_arrests %>% 
+  select(Hour, Zip, Month = month_num, Day, Season, Arrest_Type, Drugs_Alcohol, Semester, DayOfWeek, IsWeekend, latitude, longitude, year, Age, Race, Gender, Franklin) %>%
+  na.omit()
+
+rf_model = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_model_simple = randomForest(
+    Hour ~ Month + Day + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Franklin,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_model_more = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude + year + Age + Franklin + Gender + Race,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+model_data$RF_Predictions = predict(rf_model)
+model_data$RF_simple_Predictions = predict(rf_model_simple)
+model_data$RF_more_Predictions = predict(rf_model_more)
+
+evaluate_model <- function(actual, predicted) {
+  tibble(
+    MAE = mae(actual, predicted),
+    RMSE = rmse(actual, predicted)
+  )
+}
+
+mae_data <- rbind(
+  evaluate_model(model_data$Hour, model_data$RF_Predictions) %>%
+    mutate(Model = "RF - Base"),
+  
+  evaluate_model(model_data$Hour, model_data$RF_simple_Predictions) %>%
+    mutate(Model = "RF - Simple"),
+  
+  evaluate_model(model_data$Hour, model_data$RF_more_Predictions) %>%
+    mutate(Model = "RF - More")
+) %>%
+  select(Model, MAE, RMSE)
+
+mae_data %>% arrange(RMSE)
+
+model_data = model_data %>%
+  mutate(Residuals = round(Hour - RF_Predictions,5)) %>%
+  select(Hour, RF_Predictions, Residuals, everything())
+```
+
+
+
+```{r}
+comparison_df <- model_data %>%
+  select(Hour, 
+         `RF - Base` = RF_Predictions, 
+         `RF - Simple` = RF_simple_Predictions, 
+         `RF - More` = RF_more_Predictions) %>%
+  pivot_longer(cols = -Hour, names_to = "Model", values_to = "Predicted")
+
+# Plot
+ggplot(comparison_df, aes(x = Predicted, y = Hour)) +
+  geom_point(alpha = 0.3, color = "steelblue") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
+  facet_wrap(~Model, ncol = 1) +
+  labs(
+    title = "Predicted vs Actual Arrest Hour for 3 RF Models",
+    x = "Predicted Hour",
+    y = "Actual Hour"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+```{r}
+residual_df <- model_data %>%
+  mutate(
+    `RF - Base` = Hour - RF_Predictions,
+    `RF - Simple` = Hour - RF_simple_Predictions,
+    `RF - More` = Hour - RF_more_Predictions
+  ) %>%
+  select(Hour, `RF - Base`, `RF - Simple`, `RF - More`) %>%
+  pivot_longer(cols = -Hour, names_to = "Model", values_to = "Residual")
+
+ggplot(residual_df, aes(x = Hour, y = Residual)) +
+  geom_jitter(alpha = 0.3, width = 0.3, height = 0.3, color = "steelblue") +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", size = 1) +
+  facet_wrap(~ Model, ncol = 1) +
+  labs(
+    title = "Residual Plots by Model",
+    subtitle = "Residual = Actual Hour - Predicted Hour",
+    x = "Actual Arrest Hour",
+    y = "Residual"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+
+
+```{r}
+set.seed(123)  # for reproducibility
+
+# 80/20 split
+sample_index <- sample(1:nrow(model_data), size = 0.8 * nrow(model_data))
+TRAIN <- model_data[sample_index, ]
+TEST  <- model_data[-sample_index, ]
+```
+
+```{r}
+mod1 <- lm(Hour ~ Month + Day + Season + Semester + IsWeekend, data = TRAIN)
+TEST$Pred_Time <- predict(mod1, newdata = TEST)
+```
+
+```{r}
+mod2 <- lm(Hour ~ Month + Day + Season + Semester + DayOfWeek + IsWeekend + Drugs_Alcohol + Arrest_Type, data = TRAIN)
+TEST$Pred_Time_AlcType <- predict(mod2, newdata = TEST)
+```
+
+```{r}
+mod3 <- lm(Hour ~ Month + Day + Season + Semester + DayOfWeek + IsWeekend +
+              Drugs_Alcohol + Arrest_Type + Zip + latitude + longitude, data = TRAIN)
+TEST$Pred_all <- predict(mod3, newdata = TEST)
+```
+
+```{r}
+mod4 <- lm(Hour ~ IsWeekend + Drugs_Alcohol, data = TRAIN)
+TEST$Pred_few <- predict(mod4, newdata = TEST)
+```
+
+```{r}
+library(Metrics)
+
+evaluate_model <- function(actual, predicted) {
+  tibble(
+    MAE = mae(actual, predicted),
+    RMSE = rmse(actual, predicted)
+  )
+}
+
+results <- rbind(
+  evaluate_model(TEST$Hour, TEST$Pred_Time) %>% mutate(Model = "Time Only"),
+  evaluate_model(TEST$Hour, TEST$Pred_Time_AlcType) %>% mutate(Model = "Time + Context"),
+  evaluate_model(TEST$Hour, TEST$Pred_all) %>% mutate(Model = "Full"),
+  evaluate_model(TEST$Hour, TEST$Pred_few) %>% mutate(Model = "Simple Model")
+)
+
+
+results %>% select(Model, MAE, RMSE)
+```
+
+```{r}
+library(tidyr)
+
+plot_data <- TEST %>%
+  select(Hour, Pred_Time, Pred_Time_AlcType, Pred_all, Pred_few) %>%
+  pivot_longer(cols = starts_with("Pred_"), names_to = "Model", values_to = "Predicted_Hour")
+
+ggplot(plot_data, aes(x = Predicted_Hour, y = Hour, color = Model)) +
+  geom_point(alpha = 0.2) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(
+    title = "Actual vs. Predicted Arrest Hour",
+    x = "Predicted Hour",
+    y = "Actual Hour",
+    color = "Model"
+  ) +
+  theme_minimal()
+
+```
+
+
