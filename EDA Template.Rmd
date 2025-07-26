@@ -11,6 +11,7 @@ library(tidyverse)
 library(leaflet)
 library(caret)
 library(randomForest)
+library(cluster)
 
 # Import Data Below
 police_arrests = read_csv("Police_Arrests_Clean2.csv")
@@ -188,26 +189,38 @@ for(i in 1:nrow(police_arrests)) {
 }
 
 police_arrests$Hour = as.numeric(format(police_arrests$Arrest_Date, "%H"))
+police_arrests = mutate(police_arrests, 
+                        Season = as.factor(season), 
+                        Semester = as.factor(Semester))
+police_arrests$DayOfWeek = as.factor(weekdays(police_arrests$Arrest_Date))
+police_arrests$IsWeekend = as.factor(ifelse(police_arrests$DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+police_arrests$Arrest_Type = as.factor(police_arrests$Arrest_Type)
+police_arrests$Day = as.numeric(format(police_arrests$Arrest_Date, "%d"))
+police_arrests$Drugs_Alcohol = as.factor(police_arrests$Drugs_Alcohol)
 
 write.csv(police_arrests, "model_cleaned_police_arrests.csv", row.names = FALSE)
 
 model_data = police_arrests %>% 
-  select(Hour, Zip, Street, Month_Day, season, Arrest_Type, Drugs_Alcohol, Semester) %>%
+  select(Hour, Zip, Month = month_num, Day, Season, Arrest_Type, Drugs_Alcohol, Semester, DayOfWeek, IsWeekend, latitude, longitude) %>%
   na.omit()
 
-#rf_model <- randomForest(
-#  Hour ~ Zip + Street + Month_Day + season + Arrest_Type + Drugs_Alcohol + Semester,
-#  data = model_data,
-#  ntree = 100,
-#  importance = TRUE
-#)
+rf_model = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + IsWeekend + latitude + longitude,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
 
-#lm_model <- train(
-#  hour ~ ..., data = df, method = "lm", trControl = train_control
-#)
+model_data$RF_Predictions = predict(rf_model)
 
-#cv_model = crossv_kfold(data = model_data, k = 25)
+MAE.func = function(actual, predict) {
+  return (mean(abs(actual - predict)))
+}
 
+mae_data = tibble(
+  RF_MAE = MAE.func(actual = model_data$Hour, predict = model_data$RF_Predictions))
+
+mae_data
 ```
 
 
