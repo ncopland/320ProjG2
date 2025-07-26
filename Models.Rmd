@@ -67,7 +67,7 @@ agena
 ```{r, eval=FALSE}
 library(ggmap)
 
-register_stadiamaps(key = "")
+register_stadiamaps(key = "6e3ddcb7-7f60-4b9f-beec-bfca299e1a86")
 
 chapel_map <- get_stadiamap(
   bbox = c(left = -79.1, bottom = 35.87, right = -78.99, top = 36), 
@@ -153,7 +153,7 @@ franklin_daily <- franklin_daily %>%
 
 ```{r}
 
-set.seed(42)  # reproducibility
+set.seed(42)
 
 franklin_model_data <- franklin_daily %>%
   drop_na(Month, Weekday, Is_Weekend, Season, UNC_in_session)
@@ -261,7 +261,6 @@ mae_df %>% arrange(MAE)
 library(tidyverse)
 library(lubridate)
 
-# Rebuild and aggregate the daily data
 franklin_arrests <- arrests %>%
   filter(str_detect(Street, regex("FRANKLIN", ignore_case = TRUE))) %>%
   mutate(
@@ -282,7 +281,6 @@ franklin_arrests <- arrests %>%
   ) %>%
   drop_na(Month, Weekday, Is_Weekend, Season, UNC_in_session)
 
-# Rebuild and aggregate the daily data
 other_arrests <- arrests %>%
   filter(!str_detect(Street, regex("FRANKLIN", ignore_case = TRUE))) %>%
   mutate(
@@ -425,4 +423,89 @@ mae_df <- tibble(
 
 mae_df %>% arrange(RMSE)
 ```
+```{r}
+franklin_arrests <- franklin_arrests %>%
+  mutate(
+    Hour = hour(Arrest_dttm),
+    Month = month(Date),
+    Day = day(Date),
+    Weekday = weekdays(Date),
+    Is_Weekend = Weekday %in% c("Saturday", "Sunday"),
+    Semester = case_when(
+      Month %in% c(1:5) ~ "Spring",
+      Month %in% c(6:7) ~ "Summer",
+      Month %in% c(8:12) ~ "Fall"
+    )
+  )
 
+```
+
+```{r}
+model_data <- franklin_arrests %>%
+  select(
+    Hour, Month, Day, Weekday, Is_Weekend, Season, Semester,
+    UNC_in_session, Drugs_Alcohol, Arrest_Type, Age, Gender, Race,
+    latitude, longitude
+  ) %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  na.omit()
+
+```
+
+```{r}
+lm_model <- lm(Hour ~ ., data = model_data)
+model_data$LM_Predictions <- predict(lm_model)
+```
+
+```{r}
+library(randomForest)
+rf_model <- randomForest(Hour ~ ., data = model_data, ntree = 100)
+model_data$RF_Predictions <- predict(rf_model)
+
+```
+
+```{r}
+library(caret)
+set.seed(123)
+model_data1 = model_data %>%
+  select(-LM_Predictions, -RF_Predictions)
+trainIndex <- createDataPartition(model_data1$Hour, p = .8, list = FALSE)
+train_data <- model_data1[trainIndex, ]
+test_data  <- model_data1[-trainIndex, ]
+
+ctrl <- trainControl(method = "cv", number = 5)
+knn_model <- train(Hour ~ ., data = train_data, method = "knn", trControl = ctrl)
+test_data$KNN_Predictions <- predict(knn_model, newdata = test_data)
+```
+
+```{r}
+library(Metrics)
+evaluate_model <- function(actual, predicted) {
+  tibble(
+    MAE = mae(actual, predicted),
+    RMSE = rmse(actual, predicted)
+  )
+}
+
+mae_df <- bind_rows(
+  evaluate_model(model_data$Hour, model_data$LM_Predictions) %>% mutate(Model = "Linear Regression"),
+  evaluate_model(model_data$Hour, model_data$RF_Predictions) %>% mutate(Model = "Random Forest"),
+  evaluate_model(test_data$Hour, test_data$KNN_Predictions) %>% mutate(Model = "KNN")
+)
+
+mae_df %>% arrange(RMSE)
+
+```
+```{r}
+library(ggplot2)
+
+model_data_long <- model_data %>%
+  pivot_longer(cols = ends_with("_Predictions"), names_to = "Model", values_to = "Prediction")
+
+ggplot(model_data_long, aes(x = Prediction, y = Hour, color = Model)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "Predicted vs Actual Hour of Arrest on Franklin Street") +
+  theme_minimal()
+
+```
