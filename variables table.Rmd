@@ -17,7 +17,6 @@ library(tigris)
 library(ggmap)
 library(kableExtra)
 
-register_google( key = 'AIzaSyCNonjrNo5ztIcgZl6jRCXf3YFWZZfMzIk')
 ```
 
 
