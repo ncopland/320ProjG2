@@ -81,3 +81,12 @@ ggplot(disposition_summary, aes(x = Disposition, y = Proportion, fill = Underage
 
 ```
 
+```
+
+ggplot(data=filter(arrests,Underage=='Underage')) + 
+  geom_bar(aes(x=year)) + labs(title = "Underage Arrest Reports by Year",
+       x = "Year", y = "Arrest Count",
+       fill = "Group")
+
+```
+
