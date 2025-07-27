@@ -1,0 +1,36 @@
+---
+title: "Variables Table"
+output: html_document
+date: "2025-07-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE,warning=F)
+options(scipen=999)
+library(tidyverse)
+library(rvest)
+library(devtools)
+library(ggplot2)
+library(maps)
+library(tigris)
+library(ggmap)
+library(kableExtra)
+
+register_google( key = 'AIzaSyCNonjrNo5ztIcgZl6jRCXf3YFWZZfMzIk')
+```
+
+
+```{r}
+arrests = read.csv('Police_Arrests_Clean2.csv') 
+
+arrests %>%
+  mutate(latitude = round(latitude,2), longitude=round(longitude,2))%>%
+  select(Arrest_Date, Street, Arrest_Type, Drugs_Alcohol, Age, Gender, Race, Disposition) %>%
+  arrange(Arrest_Date) %>%
+  sample_n(5) %>%
+  kbl(align='l',vline='|') %>%
+  kable_styling()
+```
+
+
