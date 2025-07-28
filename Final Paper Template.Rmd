@@ -132,7 +132,7 @@ arrests %>%
   kable_styling()
 ```
 
-After doing an exploratory data analysis we found two trends to investigate further. Firstly, we observed a wide and bimodal distribution of arrest times throughout the day, with distinct peaks around midnight that showed patterned behavior. This pattern varied by day of the week, by location, and by the nature of the arrest itself. These patterns motivated us to build models that predict the "Hour of Arrest" based on contextual variables. 
+After doing an exploratory data analysis, we found two trends to investigate further. Firstly, we observed a wide and bimodal distribution of arrest times throughout the day, with distinct peaks around midnight that showed patterned behavior. This pattern varied by day of the week, by location, and by the nature of the arrest itself. These patterns motivated us to build models that predict the "Hour of Arrest" based on contextual variables. 
 
 ```{r, echo = FALSE}
 ggplot(model_data, aes(x = Hour)) +
@@ -142,7 +142,7 @@ ggplot(model_data, aes(x = Hour)) +
   theme_minimal()
 ```
 
-The second trend we noticed was a sizable number of arrest records missing age data. Many of the arrests with missing age data also had missing demographics. These arrests were not evenly distributed across Chapel Hill but instead clustered in specific geographic areas. In particular, the police headquarters and East Chapel Hill High School had over 110 arrests each. From this trend we hypothesized that the arrests with unknown ages were those of minors and the redaction of identifying information was done to protect them. The figure below shows the geographic distribution of arrests with unknown age, larger circles represent more arrests at a location.
+The second trend we noticed was a sizable number of arrest records missing age data. Many of the arrests with missing age data also had missing demographics, such as race, gender, and ethnicity. These arrests were not evenly distributed across Chapel Hill but instead clustered in specific geographic areas. In particular, the police headquarters and East Chapel Hill High School had over 110 arrests each. From this trend we hypothesized that the arrests with unknown ages were those of minors, and the redaction of identifying information was done to protect them. The figure below shows the geographic distribution of arrests with unknown age, larger circles represent more arrests at a location.
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE, comment=NA}
 uknown_age_data = police_arrests %>%
@@ -160,7 +160,7 @@ leaflet() %>%
   addCircleMarkers(lng = uknown_age_data$longitude, lat = uknown_age_data$latitude, radius = uknown_age_data$Count / 2)
 ```
 
-To support our analysis, we engineered several notable variables from the original data. From the "Arrest Date", we extracted the "Hour of Arrest", "Day of the Week", "Month", "Season", and "Academic Semester" (Spring, Summer, Fall, or Break), based on the University of North Carolina at Chapel Hill’s (UNC-CH) academic calendar. A binary indicator ("Franklin") was created to identify whether the arrest occurred on Franklin Street, a busy street that exhibits measurably higher arrest activity. We also included variables for "Zip Code", "Latitude", "Longitude", and demographics such as "Age", "Gender", and "Race". Underage status was determined by identifying rows where "Age" was missing (as these records correspond to individuals under 18 whose age was withheld). "Disposition" represents the outcome of an arrest and was used in our analysis of Question 2. Variables unrelated to our explorations (such as "Arrest ID") were excluded. 
+To support our analysis, we engineered several notable variables from the original data. From the "Arrest Date", we extracted the "Hour of Arrest", "Day of the Week", "Month", "Season", and "Academic Semester" (Spring, Summer, Fall, or Break), based on the University of North Carolina at Chapel Hill’s (UNC-CH) academic calendar. A binary indicator ("Franklin") was created to identify whether the arrest occurred on Franklin Street, a busy street in downtown Chapel Hill that exhibits measurably higher arrest activity. We also included variables for "Zip Code", "Latitude", "Longitude", and demographics such as "Age", "Gender", and "Race". Underage status was determined by identifying rows where "Age" was missing (as these records correspond to individuals under 18 whose age was withheld). "Disposition" represents the outcome of an arrest and was used in our analysis of Question 2. Variables unrelated to our explorations (such as "Arrest ID") were excluded. 
 
 # RESULTS
 
@@ -176,7 +176,7 @@ To answer this question, we developed and compared five different models to pred
 4. **Random Forest - Base Version**: Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude
 5. **Random Forest - Full Version (with added features)**: Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + Franklin + Gender + Race
 
-We explored three modeling approaches to predict the hour of arrest: linear regression, K-Nearest Neighbors (KNN), and Random Forest. Linear regression served as a baseline model to establish a benchmark for model comparison. Due to the non-linearity of our variables we did not expect the linear regression to be successful in predicting the hour accurately. We implemented a K-Nearest Neighbors (KNN) model, to predict arrest hour based on the average of the most similar observations. KNN models do well with nonlinearity but they can struggle with imbalanced data. Finally, we applied a Random Forest model, which is a type of machine learning model that builds many individual decision trees and combines their results to make more accurate and stable predictions. Each tree in the forest looks at a random subset of the data, similar to cross validation. We chose to use 100 trees in our models to reduce their reactivity to noise produced by the amount of variables being analyzed. We chose this model for our data in particular because it can handle a high number of variables of different types. Random Forest models are efficient at reducing noise so the more variables it has the better it will do at predicting, which is not always true of other models. The variables present in each model were selected based on their observed relevance in our exploratory analysis. The graphs below show our models predictions compared to the actual hour. 
+We explored three modeling approaches to predict the hour of arrest: linear regression, K-Nearest Neighbors (KNN), and Random Forest. Linear regression served as a baseline model to establish a benchmark for model comparison. Due to the non-linearity of our variables we did not expect the linear regression to be successful in predicting the hour accurately. Secondly, we implemented a K-Nearest Neighbors (KNN) model, to predict arrest hour based on the average of the most similar observations. KNN models do well with nonlinearity, but they can struggle with imbalanced data. Finally, we applied a Random Forest model, which is a type of machine learning model that builds many individual decision trees and combines their results to make more accurate and stable predictions. Each tree in the forest looks at a random subset of the data, similar to cross validation. We chose to use 100 trees in our models to reduce their reactivity to noise produced by the amount of variables being analyzed. We chose this model for our data in particular because it can handle a high number of variables of different types, so the more variables it has the better it will do at predicting, which is not always true for other models. The variables present in each model were selected based on their observed relevance in our exploratory analysis. The graphs below show each model’s predictions compared to the actual hour. 
 
 
 ```{r, fig.height=10, fig.width=12, echo = FALSE, message=FALSE, warning=FALSE, comment=NA}
@@ -270,18 +270,18 @@ ggplot(residual_df, aes(x = Hour, y = Residual)) +
   )
 ```
 
-Our models predicted relatively accurately around midday but fell off significantly in accuracy towards the hours around midnight. This is an issue with the linearity of our "Hour" variable which represented hour 0 (12am) and hour 23 (11pm) as 23 hours apart when they are really 1 hour apart. Time of day is inherently circular. In order to train our Random Forest model properly we used sine and cosine to properly represent time in a circular manner.
+While predictions were relatively accurate around midday, model performance declined significantly during the late-night hours. This is an issue with the linearity of our Hour variable which represented hour 0 (12 AM) and hour 23 (11 PM) as 23 hours apart, despite being only one hour apart in reality. Time of day is inherently circular, not linear. To address this, we transformed the Hour variable using sine and cosine functions to capture its circular nature. This places each hour on the unit circle, preserving its cyclical structure.
 
 $$
 \sin\left(\frac{2\pi \cdot \text{Hour}}{24}\right), \quad \cos\left(\frac{2\pi \cdot \text{Hour}}{24}\right)
 $$
 
-This transformation places each hour on the unit circle, preserving the cyclical structure of time. Using these new calculations we trained two Random Forest models. One to predict the sine of the hour using the variables and another to predict the cosine of the hour. We used the same variables as **Random Forest - Full** to give our machine learning model the most data to make the best predictions.
+We then trained two new Random Forest models using these transformed values: one to predict the sine of the hour, and another to predict the cosine of the hour. We used the same variables as **Random Forest - Full** to give our machine learning the most data to make the best predictions.
 
 6. **Sine Hour** = Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + 7. Franklin + Gender + Race
 7. **Cosine Hour** = Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + Franklin + Gender + Race
 
-We then combined the predictions using arctangent to reconstruct the angle on the circle which corresponds to the predicted hour.
+Once both models generated predictions for sine and cosine values, we reconstructed the predicted hour using the arctangent function, mapping it back to the appropriate angle on the unit circle.
 
 $$
 \text{Hour} = \left( \frac{\text{arctan}(\text{Sine Hour}, \text{Cosine Hour}) \cdot 24}{2\pi} \right) \bmod 24
@@ -352,7 +352,7 @@ mae_data %>%
   kable_styling()
 ```
 
-To further evaluate prediction quality, we visualized the residuals (actual - predicted hour). In models without circular transformation, residuals showed clear patterns near the edges of the clock. After applying the circular time model, the residuals were more evenly distributed, indicating a better model fit across the entire 24-hour cycle.
+To further evaluate prediction quality, we visualized residual distributions. In models using linear time, residuals showed clear patterns near the edges of the clock. After applying the circular time model, the residuals were more evenly distributed, indicating a better model fit across the entire 24-hour cycle.
 
 ```{r, fig.height=5, fig.width=12, echo = FALSE}
 residual_df <- model_data %>%
@@ -382,7 +382,7 @@ ggplot(residual_df, aes(x = Hour, y = Residual)) +
 
 The residuals now follow a sinusoidal pattern centered around zero, rather than a linear distribution. Notably, there are clusters of extreme underpredictions and overpredictions near midnight. These occur because predictions that are close to midnight must be converted back to a 24-hour scale for visualization, which creates the illusion of large errors. However, in a circular representation of time, these values are actually quite close to the true values, so these outliers can largely be ignored. 
 
-The resulting model is a relatively accurate prediction of the hour of day an arrest will occur based on the factors of that arrest. This model has practical value for both the Chapel Hill Police Department and the UNC student body. For the police, models like this can inform resource allocation around the town, enabling officers to be strategically positioned during high-risk hours. Arrests and crimes with similar characteristics can be modeled to windows of time so that officers know what to watch out for at different times of day. For students, this information can inform risk-taking behaviors, influence safer daily routines, and increase awareness about hours requiring increased vigilance. To make this model more useful, future work can incorporate additional variables such as campus events, holidays, patrol routes, etc. that may impact arrest patterns. Before this model can be used in the real world it is essential that it be evaluated for fairness across demographic groups to ensure it doesn't reinforce harmful biases.
+The resulting model is a relatively accurate prediction of the hour of day an arrest will occur based on the factors of that arrest. This model has practical value for both the Chapel Hill Police Department and the UNC-CH student body. For the police, models like this can inform resource allocation around the town, enabling officers to be strategically positioned during high-risk hours. Arrests and crimes with similar characteristics can be modeled to windows of time so that officers know what to watch out for at different times of day. For students, this information can inform risk-taking behaviors, influence safer daily routines, and increase awareness about hours requiring increased vigilance. To make this model more useful, future work can incorporate additional variables such as campus events, holidays, patrol routes, etc. that may impact arrest patterns. Before this model can be used in the real world, it is essential that it be evaluated for fairness across demographic groups to ensure it doesn’t reinforce harmful biases.
 
 #### Question 2...
 
