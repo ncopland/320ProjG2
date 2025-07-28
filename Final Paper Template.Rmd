@@ -118,7 +118,7 @@ AFTER WORKING WITH THE DATA AND DISCUSSING THE INFORMATION WITH YOUR GROUP, YOU 
 
 # DATA
 
-The data used in this project originates from the [Chapel Hill Police Department’s arrest logs](https://catalog.data.gov/dataset/police-arrests-made), which are made publicly available through the [data.gov](https://data.gov/) website. While the data was retrieved from this open-source platform, it is originally collected and maintained by the Chapel Hill Police Department. Each observation in the dataset represents an individual arrest event, with information about when and where it occurred, details of the arrest, and key demographic characteristics of the arrested individual. This dataset is not a random sample but rather a semi-comprehensive record of arrest incidents in Chapel Hill from 2010 to 2024 (With the exception of . After cleaning and filtering, our working dataset contains 37,310 observations, each corresponding to a single arrest. The following table is a representation of the most important variables provided in our data:
+The data used in this project originates from the [Chapel Hill Police Department’s arrest logs](https://catalog.data.gov/dataset/police-arrests-made), which are made publicly available through the [data.gov](https://data.gov/) website. While the data was retrieved from this open-source platform, it is originally collected and maintained by the Chapel Hill Police Department. Each observation in the dataset represents an individual arrest event, with information about when and where it occurred, details of the arrest, and key demographic characteristics of the arrested individual. This dataset is not a random sample but rather a semi-comprehensive record of arrest incidents in Chapel Hill from 2010 to 2024, with the exception of several months in 2021 (we have not recieved a response from the CHPD database manager on why this is). After cleaning and filtering, our working dataset contains 37,310 observations, each corresponding to a single arrest. The following table is a representation of the most important variables provided in our data:
 
 ```{r, echo = FALSE}
 arrests = read.csv('Police_Arrests_Clean2.csv') 
@@ -150,7 +150,7 @@ uknown_age_data = police_arrests %>%
   group_by(Street, latitude, longitude) %>%
   summarise(Count = n()) %>%
   arrange(desc(Count)) %>%
-  head(3) 
+  filter(Count > 2)
 
 
 leaflet() %>%
@@ -270,15 +270,17 @@ ggplot(residual_df, aes(x = Hour, y = Residual)) +
   )
 ```
 
-Our models predicted relatively accurately around midday but fell off significantly in accuracy towards the hours around midnight. This is an issue with the linearity of our **Hour** variable which represented hour 0 (12am) and hour 23 (11pm) as 23 hours apart when they are really 1 hour apart. Time of day is inherently circular. In order to train our Random Forest model properly we used sine and cosine to properly represent time in a circular manner.
+Our models predicted relatively accurately around midday but fell off significantly in accuracy towards the hours around midnight. This is an issue with the linearity of our "Hour" variable which represented hour 0 (12am) and hour 23 (11pm) as 23 hours apart when they are really 1 hour apart. Time of day is inherently circular. In order to train our Random Forest model properly we used sine and cosine to properly represent time in a circular manner.
 
 $$
 \sin\left(\frac{2\pi \cdot \text{Hour}}{24}\right), \quad \cos\left(\frac{2\pi \cdot \text{Hour}}{24}\right)
 $$
 
-This transformation places each hour on the unit circle, preserving the cyclical structure of time. Using these new calculations we trained two Random Forest models. One to predict the sine of the hour using the variables and another to predict the cosine of the hour using the same input variables. We used the same variables as **Random Forest - More** to give our machine learning the most data to make the best predictions.
+This transformation places each hour on the unit circle, preserving the cyclical structure of time. Using these new calculations we trained two Random Forest models. One to predict the sine of the hour using the variables and another to predict the cosine of the hour. We used the same variables as **Random Forest - Full** to give our machine learning model the most data to make the best predictions.
+
 6. **Sine Hour** = Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + 7. Franklin + Gender + Race
 7. **Cosine Hour** = Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + Franklin + Gender + Race
+
 We then combined the predictions using arctangent to reconstruct the angle on the circle which corresponds to the predicted hour.
 
 $$
@@ -324,14 +326,14 @@ ggplot(comparison_df, aes(x = Predicted, y = Hour)) +
   geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
   facet_wrap(~Model, ncol = 1) +
   labs(
-    title = "Predicted vs Actual Arrest Hour for Circular and Most Models",
+    title = "Predicted vs Actual Arrest Hour for Circular Model",
     x = "Predicted Hour",
     y = "Actual Hour"
   ) +
   theme_minimal(base_size = 14)
 ```
 
-This model shows clear improvement at handling times around midnight although it hasn't completely eliminated the over and under prediction. To evaluate how redefining time improved our model we compared the error to the previous best model based on a linear time calculation.
+This model shows clear improvement at handling times around midnight although it hasn't completely eliminated the over and under prediction. To evaluate how redefining time improved our model we compared the error to the previous best model based on a linear time representation.
 
 ```{r, echo=FALSE}
 mae_data <- rbind(
@@ -352,7 +354,7 @@ mae_data %>%
 
 To further evaluate prediction quality, we visualized the residuals (actual - predicted hour). In models without circular transformation, residuals showed clear patterns near the edges of the clock. After applying the circular time model, the residuals were more evenly distributed, indicating a better model fit across the entire 24-hour cycle.
 
-```{r, fig.height=10, fig.width=12, echo = FALSE}
+```{r, fig.height=5, fig.width=12, echo = FALSE}
 residual_df <- model_data %>%
   mutate(
     `RF - Circular` = Hour - Hour_Pred_Circular,
@@ -366,7 +368,7 @@ ggplot(residual_df, aes(x = Hour, y = Residual)) +
   geom_hline(yintercept = 0, color = "black", linetype = "dashed", size = 1) +
   facet_wrap(~ Model, ncol = 1, scales = "fixed") + 
   labs(
-    title = "Residual Plots: Circular vs. Most",
+    title = "Residual Plot: Circular",
     subtitle = "Residual = Actual Hour - Predicted Hour",
     x = "Actual Arrest Hour",
     y = "Residual"
@@ -385,4 +387,4 @@ The resulting model is a relatively accurate prediction of the hour of day an ar
 #### Question 2...
 
 # CONCLUSION
-IN LESS THAN 4 PARAGRAPHS, YOU SHOULD RESTATE YOUR QUESTIONS ALONG WITH YOUR CONCLUSIONS. THE PURPOSE OF THIS SECTION IS TO SUMMARIZE YOUR FINDINGS (SHORT), DEFEND THE IMPORTANCE OF YOUR RESULTS IN THE REAL WORLD (LONG), AND PROVIDE A ROADMAP FOR OTHERS TO CONTINUE THIS WORK (LONG). ARE YOUR CONCLUSIONS WHAT YOU EXPECTED OR UNUSUAL? WHY SHOULD SOMEONE CARE ABOUT THESE RESULTS? HOW COULD THESE RESULTS BE USED IN THE REAL WORLD? YOU SHOULD PROVIDE IDEAS ABOUT FUTURE DIRECTIONS ON WHERE YOUR MODELING COULD POSSIBLY BE IMPROVED. ARE THERE ANY METHODS YOU DIDN'T USE THAT MAY WORK BETTER? IS THERE DATA YOU DIDN'T HAVE ACCESS TO THAT MAY BE USEFUL IN THIS DATA ANALYSIS? 
+
