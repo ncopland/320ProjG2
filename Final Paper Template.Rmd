@@ -1,15 +1,116 @@
 ---
 title: "Final Paper"
-author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+author: "STOR 320.01 Group 2"
 date: "`r format(Sys.time(), '%B %d, %Y')`"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, message=FALSE, warning=FALSE, comment=NA}
+knitr::opts_chunk$set(echo = FALSE)
+library(ggplot2)
 library(tidyverse)
+library(leaflet)
+library(caret)
+library(randomForest)
+library(cluster)
+library(knitr)
+library(lubridate)
+library(Metrics)
+library(tidyr)
+library(kableExtra)
 #Put Necessary Libraries Here
 ```
+
+```{r, echo = FALSE, show_col_types=FALSE}
+police_arrests = read_csv("Police_Arrests_Clean2.csv")
+
+police_arrests$Month_Day = as.numeric(format(police_arrests$Arrest_Date, "%m%d"))
+police_arrests$Semester = NA
+
+for(i in 1:nrow(police_arrests)) {
+  if(is.na(police_arrests$Month_Day[i])) {
+    police_arrests$Semester[i] = NA
+  } else if(514 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 729) {
+    police_arrests$Semester[i] = "Summer"
+  } else if(817 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 1214) {
+    police_arrests$Semester[i] = "Fall"
+  } else if(107 <= police_arrests$Month_Day[i] && police_arrests$Month_Day[i] <= 509) {
+    police_arrests$Semester[i] = "Spring"
+  } else {
+    police_arrests$Semester[i] = "Break"
+  }
+}
+
+police_arrests$Hour = as.numeric(format(police_arrests$Arrest_Date, "%H"))
+police_arrests = mutate(police_arrests, 
+                        Season = as.factor(season), 
+                        Semester = as.factor(Semester))
+police_arrests$DayOfWeek = as.factor(weekdays(police_arrests$Arrest_Date))
+police_arrests$IsWeekend = as.factor(ifelse(police_arrests$DayOfWeek %in% c("Saturday", "Sunday"), "Weekend", "Weekday"))
+police_arrests$Arrest_Type = as.factor(police_arrests$Arrest_Type)
+police_arrests$Day = as.numeric(format(police_arrests$Arrest_Date, "%d"))
+police_arrests$Drugs_Alcohol = as.factor(police_arrests$Drugs_Alcohol)
+police_arrests$Race = as.factor(police_arrests$Race)
+police_arrests$Gender = as.factor(police_arrests$Gender)
+police_arrests$Franklin = as.factor(ifelse(str_detect(police_arrests$Street, regex("FRANKLIN", ignore_case = TRUE)), "Franklin", "Other"))
+police_arrests$sin_hour = sin(2 * pi * police_arrests$Hour / 24)
+police_arrests$cos_hour = cos(2 * pi * police_arrests$Hour / 24)
+
+model_data = police_arrests %>% 
+  select(Hour, sin_hour, cos_hour, Zip, Month = month_num, Day, Season, Arrest_Type, Drugs_Alcohol, Semester, DayOfWeek, IsWeekend, latitude, longitude, year, Age, Race, Gender, Franklin) %>%
+  na.omit()
+
+lm_model = train(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + IsWeekend,
+  data = model_data,
+  method = "lm",
+  trControl = trainControl(method = "cv", number = 5)
+)
+
+knn_model = train(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester,
+  data = model_data,
+  method = "knn",
+  trControl = trainControl(method = "cv", number = 5),
+  tuneLength = 10
+)
+
+rf_model = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_model_simple = randomForest(
+    Hour ~ Month + Day + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Franklin,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_model_more = randomForest(
+  Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude + year + Age + Franklin + Gender + Race,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+model_data$RF_Predictions = predict(rf_model)
+model_data$RF_simple_Predictions = predict(rf_model_simple)
+model_data$RF_more_Predictions = predict(rf_model_more)
+model_data$LM_Predictions = predict(lm_model)
+model_data$KNN_Predictions = predict(knn_model)
+
+
+evaluate_model <- function(actual, predicted) {
+  tibble(
+    MAE = mae(actual, predicted),
+    RMSE = rmse(actual, predicted)
+  )
+}
+```
+
 
 # INTRODUCTION
 
@@ -17,18 +118,271 @@ AFTER WORKING WITH THE DATA AND DISCUSSING THE INFORMATION WITH YOUR GROUP, YOU 
 
 # DATA
 
-IN LESS THAN 6 PARAGRAPHS, YOU SHOULD DESCRIBE THE DATA USED TO ANSWER THE QUESTIONS. YOU SHOULD EXPLAIN WHERE THE DATA ORIGINATED. FOR EXAMPLE, IT IS GOOD TO KNOW WHO COLLECTED THE DATA. JUST BECAUSE THE DATA CAME FROM KAGGLE, DOESN'T MEAN KAGGLE.COM COLLECTED THE DATA. GIVE AN IN-DEPTH DESCRIPTION OF THE SPECIFIC VARIABLES IN THE DATA REQUIRED TO ANSWER YOUR QUESTIONS. YOU SHOULDN'T DISCUSS ALL VARIABLES IN THE DATA IF YOU DIDN'T USE ALL VARIABLES IN THE DATA. YOU SHOULD EXPLAIN WHAT EACH OBSERVATION REPRESENTS (I.E. PEOPLE, SCHOOLS, STATES, CITIES, PATIENTS FROM A SPECIFIC HOSPITAL). WHAT IS THIS A SAMPLE OF? HOW MANY OBSERVATIONS DO YOU HAVE? AFTER READING THIS SECTION, THE READER SHOULD CLEARLY UNDERSTAND THE SOURCE AND CONTENT OF THE DATA YOU PLAN ON UTILIZING TO ANSWER YOUR QUESTIONS THAT YOU PROPOSED IN THE INTRODUCTION. AT LEAST ONE, DESCRIPTIVE TABLE AND AT LEAST ONE FIGURE SHOULD BE USED HERE TO HELP THE READER UNDERSTAND WHAT THE DATA LOOKS LIKE WITHOUT SEEING THE ENTIRE DATASET. IN ALL FIGURES AND TABLES, ONLY THE VARIABLES OF INTEREST SHOULD BE USED.
+The data used in this project originates from the [Chapel Hill Police Department’s arrest logs](https://catalog.data.gov/dataset/police-arrests-made), which are made publicly available through the [data.gov](https://data.gov/) website. While the data was retrieved from this open-source platform, it is originally collected and maintained by the Chapel Hill Police Department. Each observation in the dataset represents an individual arrest event, with information about when and where it occurred, details of the arrest, and key demographic characteristics of the arrested individual. This dataset is not a random sample but rather a semi-comprehensive record of arrest incidents in Chapel Hill from 2010 to 2024 (With the exception of . After cleaning and filtering, our working dataset contains 37,310 observations, each corresponding to a single arrest. The following table is a representation of the most important variables provided in our data:
+
+```{r, echo = FALSE}
+arrests = read.csv('Police_Arrests_Clean2.csv') 
+
+arrests %>%
+  mutate(Latitude = round(latitude,2), Longitude=round(longitude,2))%>%
+  select(Arrest_Date, Street, Arrest_Type, Drugs_Alcohol, Age, Gender, Race, Disposition, Latitude, Longitude) %>%
+  arrange(Arrest_Date) %>%
+  sample_n(5) %>%
+  kbl(align='l',vline='|') %>%
+  kable_styling()
+```
+
+After doing an exploratory data analysis we found two trends to investigate further. Firstly, we observed a wide and bimodal distribution of arrest times throughout the day, with distinct peaks around midnight that showed patterned behavior. This pattern varied by day of the week, by location, and by the nature of the arrest itself. These patterns motivated us to build models that predict the "Hour of Arrest" based on contextual variables. 
+
+```{r, echo = FALSE}
+ggplot(model_data, aes(x = Hour)) +
+  geom_histogram(binwidth = 1, fill = "#4B9CD3", color = "white") +
+  labs(title = "Distribution of Arrests by Hour of Day",
+       x = "Hour (0–23)", y = "Count of Arrests") +
+  theme_minimal()
+```
+
+The second trend we noticed was a sizable number of arrest records missing age data. Many of the arrests with missing age data also had missing demographics. These arrests were not evenly distributed across Chapel Hill but instead clustered in specific geographic areas. In particular, the police headquarters and East Chapel Hill High School had over 110 arrests each. From this trend we hypothesized that the arrests with unknown ages were those of minors and the redaction of identifying information was done to protect them. The figure below shows the geographic distribution of arrests with unknown age, larger circles represent more arrests at a location.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, comment=NA}
+uknown_age_data = police_arrests %>%
+  filter(is.na(Age)) %>%
+  group_by(Street, latitude, longitude) %>%
+  summarise(Count = n()) %>%
+  arrange(desc(Count)) %>%
+  head(3) 
+
+
+leaflet() %>%
+  addTiles() %>%
+  setView(lng = -79.0558, lat = 35.9132, zoom = 13) %>%
+  addMarkers(lng = -79.0558, lat = 35.9132, popup = "Chapel Hill, NC") %>%
+  addCircleMarkers(lng = uknown_age_data$longitude, lat = uknown_age_data$latitude, radius = uknown_age_data$Count / 2)
+```
+
+To support our analysis, we engineered several notable variables from the original data. From the "Arrest Date", we extracted the "Hour of Arrest", "Day of the Week", "Month", "Season", and "Academic Semester" (Spring, Summer, Fall, or Break), based on the University of North Carolina at Chapel Hill’s (UNC-CH) academic calendar. A binary indicator ("Franklin") was created to identify whether the arrest occurred on Franklin Street, a busy street that exhibits measurably higher arrest activity. We also included variables for "Zip Code", "Latitude", "Longitude", and demographics such as "Age", "Gender", and "Race". Underage status was determined by identifying rows where "Age" was missing (as these records correspond to individuals under 18 whose age was withheld). "Disposition" represents the outcome of an arrest and was used in our analysis of Question 2. Variables unrelated to our explorations (such as "Arrest ID") were excluded. 
 
 # RESULTS
 
 IN LESS THAN 6 PARAGRAPHS FOR EACH OF THE TWO QUESTIONS, YOU SHOULD DESCRIBE THE METHODOLOGY YOU USED TO ANSWER EACH QUESTION AND THE RESULTS FROM IMPLEMENTING THAT METHODOLOGY. YOU ARE FREE TO USE ANY MODELING TECHNIQUES OR STATISTICAL TESTS. YOU ARE NOT RESTRICTED TO METHODS DISCUSSED IN THIS CLASS. I HIGHLY ENCOURAGE YOU TO EXPLORE MORE ADVANCED TECHNIQUES THAT ARE APPROPRIATE GIVEN YOUR QUESTIONS. I HIGHLY ENCOURAGE MULTIPLE TECHNIQUES TO BE CONSIDERED TO ANSWER EACH QUESTION. FOR EXAMPLE, MULTIPLE MODELS CAN BE USED TO EXPLORE THE IMPACT OF MULTIPLE PREDICTOR VARIABLES ON 1 EXPLANATORY VARIABLE. ALL DISCOVERIES AND REVELATIONS ABOUT YOUR QUESTIONS SHOULD BE CLEARLY STATED. BY THE END OF READING THIS SECTION, THE READER SHOULD KNOW THE ANSWERS TO YOUR QUESTIONS BASED ON DATA AND NOT OPINION. IF ANY RESULTS SEEM TO BE UNUSUAL, YOU ARE FREE TO GIVE OPINIONS AND IDEAS WHY CERTAIN PHENOMENON EXIST. ALWAYS THINK CREATIVELY AND USE AT LEAST 4 FIGURES AND/OR TABLES IN THIS SECTION TO HELP THE READER VISUALIZE WHAT YOU ARE TRYING TO EXPLAIN. 
 
+#### Question 1: Can We Predict the Hour of Day When Arrests Are Most Likely to Occur?
+
+To answer this question, we developed and compared five different models to predict the hour of arrest. These included:
+
+1. **Linear Regression**: Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + IsWeekend
+2. **K-Nearest Neighbors (KNN)**: Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester
+3. **Random Forest - Simple Version**: Hour ~ Month + Day + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Franklin
+4. **Random Forest - Base Version**: Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude
+5. **Random Forest - Full Version (with added features)**: Hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + Franklin + Gender + Race
+
+We explored three modeling approaches to predict the hour of arrest: linear regression, K-Nearest Neighbors (KNN), and Random Forest. Linear regression served as a baseline model to establish a benchmark for model comparison. Due to the non-linearity of our variables we did not expect the linear regression to be successful in predicting the hour accurately. We implemented a K-Nearest Neighbors (KNN) model, to predict arrest hour based on the average of the most similar observations. KNN models do well with nonlinearity but they can struggle with imbalanced data. Finally, we applied a Random Forest model, which is a type of machine learning model that builds many individual decision trees and combines their results to make more accurate and stable predictions. Each tree in the forest looks at a random subset of the data, similar to cross validation. We chose to use 100 trees in our models to reduce their reactivity to noise produced by the amount of variables being analyzed. We chose this model for our data in particular because it can handle a high number of variables of different types. Random Forest models are efficient at reducing noise so the more variables it has the better it will do at predicting, which is not always true of other models. The variables present in each model were selected based on their observed relevance in our exploratory analysis. The graphs below show our models predictions compared to the actual hour. 
+
+
+```{r, fig.height=10, fig.width=12, echo = FALSE, message=FALSE, warning=FALSE, comment=NA}
+comparison_df <- model_data %>%
+  select(Hour, 
+         `Linear Model` = LM_Predictions,
+         `KNN` = KNN_Predictions,
+         `RF - Simple` = RF_simple_Predictions, 
+         `RF - Base` = RF_Predictions, 
+         `RF - Full` = RF_more_Predictions) %>%
+  pivot_longer(cols = -Hour, names_to = "Model", values_to = "Predicted") %>%
+  mutate(Model = factor(Model, levels = c("Linear Model", "KNN", "RF - Simple", "RF - Base", "RF - Full")))
+
+# Set axis limits (optional: adjust as needed)
+hour_limits <- c(0, 23)  # Assuming hours are in 0–23
+
+# Plot
+ggplot(comparison_df, aes(x = Predicted, y = Hour)) +
+  geom_point(alpha = 0.3, color = "steelblue") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
+  facet_wrap(~Model, ncol = 1, scales = "fixed") +
+  coord_cartesian(xlim = hour_limits, ylim = hour_limits) +
+  labs(
+    title = "Predicted vs Actual Arrest Hour by Model",
+    x = "Predicted Hour",
+    y = "Actual Hour"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 16)
+  )
+```
+
+All models were evaluated using **Mean Absolute Error (MAE)** and **Root Mean Square Error (RMSE)** to assess their predictive accuracy.
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, comment=NA}
+mae_data <- rbind(
+  evaluate_model(model_data$Hour, model_data$RF_Predictions) %>%
+    mutate(Model = "Random Forest - Base"),
+  
+  evaluate_model(model_data$Hour, model_data$RF_simple_Predictions) %>%
+    mutate(Model = "Random Forest - Simple"),
+  
+  evaluate_model(model_data$Hour, model_data$RF_more_Predictions) %>%
+    mutate(Model = "Random Forest - Full"),
+  
+  evaluate_model(model_data$Hour, model_data$LM_Predictions) %>%
+    mutate(Model = "Linear"), 
+  
+  evaluate_model(model_data$Hour, model_data$KNN_Predictions) %>%
+    mutate(Model = "KNN")
+) %>%
+  select(Model, MAE, RMSE)
+mae_data %>%
+  arrange(RMSE) %>%
+  kbl(align='l',vline='|') %>%
+  kable_styling()
+```
+
+The best-performing model was the **Random Forest - Full**, which clearly demonstrates that the Random Forest machine learning model improves with more data input. Every model tends to over-predict after midnight and under-predict before midnight. A glance at the residuals (actual - predicted hour) confirms this:
+
+```{r, fig.height=10, fig.width=12, echo = FALSE}
+residual_df <- model_data %>%
+  mutate(
+    `Linear Model` = Hour - LM_Predictions,
+    `KNN` = Hour - KNN_Predictions,
+    `RF - Base` = Hour - RF_Predictions,
+    `RF - Simple` = Hour - RF_simple_Predictions,
+    `RF - Full` = Hour - RF_more_Predictions
+  ) %>%
+  select(Hour, `Linear Model`, `KNN`, `RF - Simple`, `RF - Base`, `RF - Full`) %>%
+  pivot_longer(cols = -Hour, names_to = "Model", values_to = "Residual") %>%
+  mutate(Model = factor(Model, levels = c("Linear Model", "KNN", "RF - Simple", "RF - Base", "RF - Full")))
+
+# Plot
+ggplot(residual_df, aes(x = Hour, y = Residual)) +
+  geom_jitter(alpha = 0.3, width = 0.3, height = 0.3, color = "steelblue") +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", size = 1) +
+  facet_wrap(~ Model, ncol = 1, scales = "fixed") + 
+  labs(
+    title = "Residual Plots by Model",
+    subtitle = "Residual = Actual Hour - Predicted Hour",
+    x = "Actual Arrest Hour",
+    y = "Residual"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 16)
+  )
+```
+
+Our models predicted relatively accurately around midday but fell off significantly in accuracy towards the hours around midnight. This is an issue with the linearity of our **Hour** variable which represented hour 0 (12am) and hour 23 (11pm) as 23 hours apart when they are really 1 hour apart. Time of day is inherently circular. In order to train our Random Forest model properly we used sine and cosine to properly represent time in a circular manner.
+
+$$
+\sin\left(\frac{2\pi \cdot \text{Hour}}{24}\right), \quad \cos\left(\frac{2\pi \cdot \text{Hour}}{24}\right)
+$$
+
+This transformation places each hour on the unit circle, preserving the cyclical structure of time. Using these new calculations we trained two Random Forest models. One to predict the sine of the hour using the variables and another to predict the cosine of the hour using the same input variables. We used the same variables as **Random Forest - More** to give our machine learning the most data to make the best predictions.
+6. **Sine Hour** = Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + 7. Franklin + Gender + Race
+7. **Cosine Hour** = Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + Latitude + Longitude + Year + Age + Franklin + Gender + Race
+We then combined the predictions using arctangent to reconstruct the angle on the circle which corresponds to the predicted hour.
+
+$$
+\text{Hour} = \left( \frac{\text{arctan}(\text{Sine Hour}, \text{Cosine Hour}) \cdot 24}{2\pi} \right) \bmod 24
+$$
+
+The result is the model below:
+
+```{r, echo = FALSE}
+rf_sin_model = randomForest(
+  sin_hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude + year + Age + Franklin + Gender + Race,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+
+rf_cos_model = randomForest(
+  cos_hour ~ Zip + Month + Day + Season + Arrest_Type + Drugs_Alcohol + Semester + DayOfWeek + latitude + longitude + year + Age + Franklin + Gender + Race,
+  data = model_data,
+  ntree = 100,
+  importance = TRUE
+)
+model_data$sin_pred = predict(rf_sin_model)
+model_data$cos_pred = predict(rf_cos_model)
+
+model_data$angle_pred = atan2(model_data$sin_pred, model_data$cos_pred)
+model_data$Hour_Pred_Circular = (model_data$angle_pred * 24 / (2 * pi)) %% 24
+model_data$Hour_Pred_Circular_Rounded = round(model_data$Hour_Pred_Circular)
+
+```
+
+
+
+```{r, fig.height=5, fig.width=12, echo = FALSE}
+comparison_df <- model_data %>%
+  select(Hour,
+         `RF - Circular` = Hour_Pred_Circular) %>%
+  pivot_longer(cols = -Hour, names_to = "Model", values_to = "Predicted")
+
+# Plot
+ggplot(comparison_df, aes(x = Predicted, y = Hour)) +
+  geom_point(alpha = 0.3, color = "steelblue") +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", size = 1) +
+  facet_wrap(~Model, ncol = 1) +
+  labs(
+    title = "Predicted vs Actual Arrest Hour for Circular and Most Models",
+    x = "Predicted Hour",
+    y = "Actual Hour"
+  ) +
+  theme_minimal(base_size = 14)
+```
+
+This model shows clear improvement at handling times around midnight although it hasn't completely eliminated the over and under prediction. To evaluate how redefining time improved our model we compared the error to the previous best model based on a linear time calculation.
+
+```{r, echo=FALSE}
+mae_data <- rbind(
+  evaluate_model(model_data$Hour, model_data$RF_more_Predictions) %>%
+    mutate(Model = "Random Forest - Full"),
+  
+  evaluate_model(model_data$Hour, model_data$Hour_Pred_Circular) %>%
+    mutate(Model = "Random Forest - Circular")
+) %>%
+  select(Model, MAE, RMSE)
+
+
+mae_data %>%
+  arrange(MAE) %>%
+  kbl(align='l',vline='|') %>%
+  kable_styling()
+```
+
+To further evaluate prediction quality, we visualized the residuals (actual - predicted hour). In models without circular transformation, residuals showed clear patterns near the edges of the clock. After applying the circular time model, the residuals were more evenly distributed, indicating a better model fit across the entire 24-hour cycle.
+
+```{r, fig.height=10, fig.width=12, echo = FALSE}
+residual_df <- model_data %>%
+  mutate(
+    `RF - Circular` = Hour - Hour_Pred_Circular,
+  ) %>%
+  select(Hour, `RF - Circular`) %>%
+  pivot_longer(cols = -Hour, names_to = "Model", values_to = "Residual")
+
+# Plot
+ggplot(residual_df, aes(x = Hour, y = Residual)) +
+  geom_jitter(alpha = 0.3, width = 0.3, height = 0.3, color = "steelblue") +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed", size = 1) +
+  facet_wrap(~ Model, ncol = 1, scales = "fixed") + 
+  labs(
+    title = "Residual Plots: Circular vs. Most",
+    subtitle = "Residual = Actual Hour - Predicted Hour",
+    x = "Actual Arrest Hour",
+    y = "Residual"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(face = "bold", size = 16)
+  )
+```
+
+The residuals now follow a sinusoidal pattern centered around zero, rather than a linear distribution. Notably, there are clusters of extreme underpredictions and overpredictions near midnight. These occur because predictions that are close to midnight must be converted back to a 24-hour scale for visualization, which creates the illusion of large errors. However, in a circular representation of time, these values are actually quite close to the true values, so these outliers can largely be ignored. 
+
+The resulting model is a relatively accurate prediction of the hour of day an arrest will occur based on the factors of that arrest. This model has practical value for both the Chapel Hill Police Department and the UNC student body. For the police, models like this can inform resource allocation around the town, enabling officers to be strategically positioned during high-risk hours. Arrests and crimes with similar characteristics can be modeled to windows of time so that officers know what to watch out for at different times of day. For students, this information can inform risk-taking behaviors, influence safer daily routines, and increase awareness about hours requiring increased vigilance. To make this model more useful, future work can incorporate additional variables such as campus events, holidays, patrol routes, etc. that may impact arrest patterns. Before this model can be used in the real world it is essential that it be evaluated for fairness across demographic groups to ensure it doesn't reinforce harmful biases.
+
+#### Question 2...
+
 # CONCLUSION
 IN LESS THAN 4 PARAGRAPHS, YOU SHOULD RESTATE YOUR QUESTIONS ALONG WITH YOUR CONCLUSIONS. THE PURPOSE OF THIS SECTION IS TO SUMMARIZE YOUR FINDINGS (SHORT), DEFEND THE IMPORTANCE OF YOUR RESULTS IN THE REAL WORLD (LONG), AND PROVIDE A ROADMAP FOR OTHERS TO CONTINUE THIS WORK (LONG). ARE YOUR CONCLUSIONS WHAT YOU EXPECTED OR UNUSUAL? WHY SHOULD SOMEONE CARE ABOUT THESE RESULTS? HOW COULD THESE RESULTS BE USED IN THE REAL WORLD? YOU SHOULD PROVIDE IDEAS ABOUT FUTURE DIRECTIONS ON WHERE YOUR MODELING COULD POSSIBLY BE IMPROVED. ARE THERE ANY METHODS YOU DIDN'T USE THAT MAY WORK BETTER? IS THERE DATA YOU DIDN'T HAVE ACCESS TO THAT MAY BE USEFUL IN THIS DATA ANALYSIS? 
-
-
-
-
-
-
-
