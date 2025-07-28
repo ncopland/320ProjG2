@@ -1,0 +1,102 @@
+---
+title: "projectQuestion2.2"
+output: html_document
+date: "2025-07-25"
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r 2.1 r setup, include=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(scales)
+library(purrr)
+library(dplyr)
+library(readr)
+library(ggplot2)
+
+DATA <- read_csv("Police_Arrests_Clean.csv", col_types = cols())
+
+# Create underage column
+arrests <- DATA %>%
+  mutate(Underage = if_else(is.na(Age), "Underage", "Non-Underage"))
+
+arrest_cluster_data <- arrests %>%
+  group_by(Underage, Arrest_Type) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Underage) %>%
+  mutate(Proportion = n / sum(n))
+```
+
+
+# What factors differentiate the legal processing of underage individuals from that of the general arrested population?
+
+
+To explore age-based differences in arrest processing, we analyzed arrest records from Chapel Hill between 2010 and 2023 using descriptive statistics and data visualizations in R. We created a binary variable for underage status and grouped the data by “Arrest_Type” and “Disposition.” For each group, we calculated both raw counts and proportions, and visualized the results using bar plots with overlaid labels. This approach allowed us to clearly compare processing trends between minors and adults, helping to uncover systematic differences in how each group is treated by law enforcement.
+
+Our analysis revealed that underage individuals were more likely to be Summoned/Cited (45.2%) compared to non-underage individuals (34.9%). In contrast, non-underage individuals were more often Taken into Custody via Warrant (27.4%) than underage individuals (18.7%). The proportion of On View arrests was nearly identical between both groups. These differences suggest that minors are less likely to be physically detained, possibly due to legal protections or procedural considerations aimed at youth populations.
+
+# Arrest type by Underage Status
+```{r 2.2, echo=FALSE}
+ggplot(arrest_cluster_data, aes(x = Arrest_Type, y = Proportion, fill = Underage)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+  geom_text(aes(label = scales::percent(Proportion, accuracy = 0.1)),
+            position = position_dodge(width = 0.7),
+            vjust = -0.3, size = 3) +
+  scale_fill_manual(values = c("Underage" = "steelblue", "Non-Underage" = "red")) +
+  labs(title = "Arrest Type by Underage Status",
+       x = "Arrest Type", y = "Proportion",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, 0.1))) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+These results may reflect practical or legal considerations when handling minors. Police may prefer issuing citations rather than physical detainment for youth, or legal requirements may limit the use of warrants for minors.
+
+
+# Dispositions
+For Dispositions, we found that underage individuals were significantly more likely to have their cases formally resolved. Of 1,843 underage arrests, 95.4% were cleared by arrest, compared to 92.4% of 35,317 non-underage arrests. Fewer underage arrests resulted in “Arrest/No Investigation” (4.5% vs. 7.4%). This suggests juvenile cases may follow more formal or legally required processing.
+
+
+
+```{r, echo=FALSE}
+disposition_summary <- arrests %>%
+  group_by(Underage, Disposition) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(Underage) %>%
+  mutate(
+    Proportion = n / sum(n),
+    Count_Label = as.character(n),
+    Prop_Label = scales::percent(Proportion, accuracy = 0.1)
+  )
+
+ggplot(disposition_summary, aes(x = Disposition, y = Proportion, fill = Underage)) +
+  geom_col(position = position_dodge(width = 0.7), width = 0.6) +
+
+  geom_text(aes(label = Count_Label),
+            position = position_dodge(width = 0.7),
+            vjust = 1.1, color = "white", size = 3, fontface = "bold") +
+
+  geom_text(aes(label = Prop_Label),
+            position = position_dodge(width = 0.7),
+            vjust = -0.5, color = "black", size = 3.3) +
+
+  scale_fill_manual(values = c("Underage" = "steelblue", "Non-Underage" = "red")) +
+  labs(title = "Disposition of All Arrests",
+       subtitle = "Counts Inside Bars, Proportions Above",
+       x = "Disposition", y = "Proportion",
+       fill = "Group") +
+  scale_y_continuous(labels = scales::percent_format(), expand = expansion(mult = c(0, .12))) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+
+
+# Conclusion
+These findings suggest that minors in Chapel Hill are processed through more uniform and formal legal channels receiving citations more often and having their cases cleared at higher rates likely due to protective policies around youth. This pattern creates an opportunity to assess whether current adult arrest procedures are overly variable or inconsistent. For policymakers, this insight could justify a review of discretionary arrest practices, especially for non-violent offenses, with an eye toward expanding structured alternatives like citations or community-based interventions. The consistency in how underage arrests are handled suggests a successful model of structured processing. Law enforcement could pilot more standardized procedures for non-violent adult arrests, reducing discretionary variability and improving transparency.
+<br><br><br><br>
